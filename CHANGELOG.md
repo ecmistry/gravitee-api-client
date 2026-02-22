@@ -285,3 +285,36 @@
 - **graphql.test.ts**: formatGraphQL, getExplorableTypes, introspectSchema, executeGraphQL
 - **GraphQLClient.test.tsx**: URL input, Schema/Execute buttons, Query tab, Response tab, Schema sidebar
 - **Phase7.integration.test.tsx**: GraphQL type selector, GraphQL client UI
+
+---
+
+## Phase 8 — Mock Servers
+
+### Mock Server Creation
+
+| Feature | Status |
+|--------|--------|
+| Create a mock server from a collection | Done |
+| Assign example responses to each saved request | Done |
+| Start/stop mock server on a local port | Done (`npm run mock`) |
+
+### Route Matching
+
+| Feature | Status |
+|--------|--------|
+| Match by method + path | Done |
+| Path parameter support (e.g., /users/:id) | Done |
+| Query parameter matching rules | Done |
+
+### Response Configuration
+
+| Feature | Status |
+|--------|--------|
+| Set status code, headers, body per route | Done |
+| Multiple examples with selection (random, sequential, first, match by query param) | Done |
+| Response delay simulation | Done |
+
+### Tests (Phase 8)
+
+- **mockServer.test.ts**: matchPath, matchQuery, selectExample, findMatchingRoute, getPathFromUrl, toPathPattern
+- **MockServer.test.tsx**: Dialog, collection selector, Apply/Stop buttons

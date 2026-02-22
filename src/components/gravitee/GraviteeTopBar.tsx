@@ -1,8 +1,9 @@
-import { Upload, Download, Settings, Play } from 'lucide-react';
+import { Upload, Download, Settings, Play, Server } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { exportToJSON, detectFormat, importFromPostman, importFromInsomnia } from '@/lib/importExport';
 import { EnvironmentSelector } from '@/components/gravitee/EnvironmentSelector';
 import { CollectionRunner } from '@/components/gravitee/CollectionRunner';
+import { MockServer } from '@/components/gravitee/MockServer';
 import { useState } from 'react';
 import type { Collection, KeyValuePair } from '@/types/api';
 import type { Environment } from '@/lib/variables';
@@ -30,6 +31,7 @@ export function GraviteeTopBar({
   onGlobalVarsChange = () => {},
 }: TopBarProps) {
   const [runnerOpen, setRunnerOpen] = useState(false);
+  const [mockOpen, setMockOpen] = useState(false);
   const handleExport = () => {
     const json = exportToJSON(collections);
     const blob = new Blob([json], { type: 'application/json' });
@@ -93,6 +95,15 @@ export function GraviteeTopBar({
           <Play className="w-3.5 h-3.5 mr-1.5" />
           Run Collection
         </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setMockOpen(true)}
+          className="text-muted-foreground hover:text-foreground h-8 px-3 text-xs"
+        >
+          <Server className="w-3.5 h-3.5 mr-1.5" />
+          Mock Server
+        </Button>
         <div className="w-px h-4 bg-border" />
         {onEnvironmentsChange ? (
           <EnvironmentSelector
@@ -140,6 +151,7 @@ export function GraviteeTopBar({
         environments={environments}
         globalVars={globalVars}
       />
+      <MockServer open={mockOpen} onOpenChange={setMockOpen} collections={collections} />
     </header>
   );
 }
