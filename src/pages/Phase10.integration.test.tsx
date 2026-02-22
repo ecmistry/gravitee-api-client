@@ -1,6 +1,6 @@
 /**
- * Phase 7 integration tests
- * Verifies Phase 7 features: GraphQL request type
+ * Phase 10 integration tests
+ * Verifies Phase 10 features: Workspaces, Settings sheet, Activity
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
@@ -23,22 +23,23 @@ const localStorageMock = (() => {
 })();
 Object.defineProperty(global, 'localStorage', { value: localStorageMock });
 
-describe('Phase 7 - Index page', () => {
+describe('Phase 10 - Index page', () => {
   beforeEach(() => {
     localStorageMock.clear();
   });
 
-  it('renders GraphQL type selector', () => {
+  it('renders workspace switcher in sidebar', () => {
     render(<TestWrapper><Index /></TestWrapper>);
-    expect(screen.getByRole('button', { name: 'GraphQL' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /personal/i })).toBeInTheDocument();
   });
 
-  it('shows GraphQL client when GraphQL type selected', async () => {
+  it('opens Settings sheet when Settings button clicked', async () => {
     const user = (await import('@testing-library/user-event')).default.setup();
     render(<TestWrapper><Index /></TestWrapper>);
-    await user.click(screen.getByRole('button', { name: 'GraphQL' }));
-    expect(screen.getByPlaceholderText(/https:\/\/api\.example\.com\/graphql/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /execute/i })).toBeInTheDocument();
-    expect(screen.getAllByRole('button', { name: /schema/i }).length).toBeGreaterThanOrEqual(1);
+    await user.click(screen.getByRole('button', { name: /settings/i }));
+    expect(screen.getByRole('heading', { name: /settings/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /workspaces/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /profile/i })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /activity/i })).toBeInTheDocument();
   });
 });

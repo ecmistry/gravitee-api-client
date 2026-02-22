@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, Plus, ChevronDown, ChevronRight, Folder, FolderOpen, Pencil, Trash2, History, X, Copy, GripVertical, Shield, FileText } from 'lucide-react';
+import { Search, Plus, ChevronDown, ChevronRight, Folder, FolderOpen, Pencil, Trash2, History, X, Copy, GripVertical, Shield, FileText, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -10,8 +10,16 @@ import { CSS } from '@dnd-kit/utilities';
 import type { Collection, ApiRequest, Folder } from '@/types/api';
 import type { AuthConfig } from '@/types/auth';
 import { METHOD_BG_COLORS } from '@/types/api';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { logCollectionActivity } from '@/lib/workspaceStorage';
 import { AuthTab } from './AuthTab';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuCheckboxItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface SidebarProps {
   collections: Collection[];
@@ -42,6 +50,7 @@ function SortableCollectionItem({
 }
 
 export function GraviteeSidebar({ collections, setCollections, activeRequest, setActiveRequest }: SidebarProps) {
+  const { activeWorkspaceId, workspaces, activeWorkspace, setActiveWorkspaceId } = useWorkspace();
   const [searchQuery, setSearchQuery] = useState('');
   const [editingCollectionId, setEditingCollectionId] = useState<string | null>(null);
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
@@ -115,6 +124,7 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
 
   const addNewRequest = (collectionId: string, folderId?: string) => {
     const newReq = newRequest();
+    logCollectionActivity(activeWorkspaceId, 'create', 'request', newReq.id, newReq.name);
     setCollections(collections.map(col => {
       if (col.id !== collectionId) return col;
       if (folderId) {
@@ -136,15 +146,18 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
       name: 'New Folder',
       requests: []
     };
-    setCollections(collections.map(col =>
-      col.id === collectionId ? { ...col, folders: [...col.folders, folder] } : col
+    const col = collections.find(c => c.id === collectionId);
+    setCollections(collections.map(c =>
+      c.id === collectionId ? { ...c, folders: [...c.folders, folder] } : c
     ));
     setExpandedCollections(prev => new Set([...prev, folder.id]));
+    if (col) logCollectionActivity(activeWorkspaceId, 'create', 'folder', folder.id, folder.name);
   };
 
   const deleteCollection = (collectionId: string) => {
     const col = collections.find(c => c.id === collectionId);
     if (!col) return;
+    logCollectionActivity(activeWorkspaceId, 'delete', 'collection', col.id, col.name);
     const hasActive = col.requests.some(r => r.id === activeRequest.id) ||
       col.folders.some(f => f.requests.some(r => r.id === activeRequest.id));
     if (hasActive) {
@@ -156,6 +169,7 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
 
   const duplicateRequest = (request: ApiRequest, collectionId: string, folderId?: string) => {
     const dup: ApiRequest = { ...request, id: `temp-${Date.now()}`, name: `${request.name} (copy)` };
+    logCollectionActivity(activeWorkspaceId, 'create', 'request', dup.id, dup.name);
     setCollections(collections.map(col => {
       if (col.id !== collectionId) return col;
       if (folderId) {
@@ -192,6 +206,7 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
     };
     setCollections([...collections, col]);
     setExpandedCollections(prev => new Set([...prev, col.id]));
+    logCollectionActivity(activeWorkspaceId, 'create', 'collection', col.id, col.name);
   };
 
   const startRenameCollection = (collection: Collection) => {
@@ -206,9 +221,11 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
       setEditingCollectionId(null);
       return;
     }
+    const newName = editingName.trim();
     setCollections(collections.map(col =>
-      col.id === editingCollectionId ? { ...col, name: editingName.trim() } : col
+      col.id === editingCollectionId ? { ...col, name: newName } : col
     ));
+    logCollectionActivity(activeWorkspaceId, 'update', 'collection', editingCollectionId, newName);
     setEditingCollectionId(null);
     setEditingName('');
   };
@@ -230,18 +247,22 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
       setEditingFolderId(null);
       return;
     }
+    const newName = editingName.trim();
     setCollections(collections.map(col => ({
       ...col,
-      folders: col.folders.map(f => f.id === editingFolderId ? { ...f, name: editingName.trim() } : f)
+      folders: col.folders.map(f => f.id === editingFolderId ? { ...f, name: newName } : f)
     })));
+    logCollectionActivity(activeWorkspaceId, 'update', 'folder', editingFolderId, newName);
     setEditingFolderId(null);
     setEditingName('');
   };
 
   const deleteFolder = (folderId: string, collectionId: string) => {
+    const folder = collections.find(c => c.id === collectionId)?.folders.find(f => f.id === folderId);
     setCollections(collections.map(col =>
       col.id === collectionId ? { ...col, folders: col.folders.filter(f => f.id !== folderId) } : col
     ));
+    if (folder) logCollectionActivity(activeWorkspaceId, 'delete', 'folder', folder.id, folder.name);
   };
 
   const setCollectionAuth = (collectionId: string, auth: AuthConfig | undefined) => {
@@ -270,21 +291,23 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
       setEditingRequestId(null);
       return;
     }
+    const newName = editingName.trim();
     setCollections(collections.map(col => ({
       ...col,
       requests: col.requests.map(req =>
-        req.id === editingRequestId ? { ...req, name: editingName.trim() } : req
+        req.id === editingRequestId ? { ...req, name: newName } : req
       ),
       folders: col.folders.map(f => ({
         ...f,
         requests: f.requests.map(req =>
-          req.id === editingRequestId ? { ...req, name: editingName.trim() } : req
+          req.id === editingRequestId ? { ...req, name: newName } : req
         )
       }))
     })));
     setActiveRequest(prev =>
-      prev.id === editingRequestId ? { ...prev, name: editingName.trim() } : prev
+      prev.id === editingRequestId ? { ...prev, name: newName } : prev
     );
+    logCollectionActivity(activeWorkspaceId, 'update', 'request', editingRequestId, newName);
     setEditingRequestId(null);
     setEditingName('');
   };
@@ -295,6 +318,7 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
   };
 
   const deleteRequest = (request: ApiRequest, collectionId: string, folderId?: string) => {
+    logCollectionActivity(activeWorkspaceId, 'delete', 'request', request.id, request.name);
     const updatedCollections = collections.map(col => {
       if (col.id !== collectionId) return col;
       if (folderId) {
@@ -340,6 +364,32 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
 
   return (
     <div className="w-64 bg-sidebar border-r border-border flex flex-col h-full shrink-0">
+      {/* Workspace switcher */}
+      <div className="p-2 border-b border-border">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-2 h-8 px-2 text-xs font-medium text-sidebar-foreground hover:text-foreground"
+            >
+              <Layers className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate flex-1 text-left">{activeWorkspace?.name ?? 'Workspace'}</span>
+              <ChevronDown className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" side="bottom" className="w-56">
+            {workspaces.map((ws) => (
+              <DropdownMenuCheckboxItem
+                key={ws.id}
+                checked={activeWorkspaceId === ws.id}
+                onSelect={() => setActiveWorkspaceId(ws.id)}
+              >
+                {ws.name}
+              </DropdownMenuCheckboxItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
       {/* Search */}
       <div className="p-3 border-b border-border">
         <div className="flex items-center gap-2 rounded-md border border-border bg-background px-3 h-8 focus-within:ring-1 focus-within:ring-primary focus-within:border-primary transition-all">

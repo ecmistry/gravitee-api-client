@@ -5,7 +5,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
+import { WorkspaceProvider } from '@/contexts/WorkspaceContext';
 import Index from './Index';
+
+const TestWrapper = ({ children }: { children: React.ReactNode }) => (
+  <BrowserRouter><WorkspaceProvider>{children}</WorkspaceProvider></BrowserRouter>
+);
 
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
@@ -24,13 +29,13 @@ describe('Phase 5 - Index page', () => {
   });
 
   it('renders Run Collection button in top bar', () => {
-    render(<BrowserRouter><Index /></BrowserRouter>);
+    render(<TestWrapper><Index /></TestWrapper>);
     expect(screen.getByRole('button', { name: /run collection/i })).toBeInTheDocument();
   });
 
   it('opens Collection Runner dialog when Run Collection clicked', async () => {
     const user = (await import('@testing-library/user-event')).default.setup();
-    render(<BrowserRouter><Index /></BrowserRouter>);
+    render(<TestWrapper><Index /></TestWrapper>);
     await user.click(screen.getByRole('button', { name: /run collection/i }));
     expect(screen.getByRole('dialog', { name: /collection runner/i })).toBeInTheDocument();
   });

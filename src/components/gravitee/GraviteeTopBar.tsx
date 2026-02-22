@@ -5,6 +5,7 @@ import { EnvironmentSelector } from '@/components/gravitee/EnvironmentSelector';
 import { CollectionRunner } from '@/components/gravitee/CollectionRunner';
 import { MockServer } from '@/components/gravitee/MockServer';
 import { ApiDocs } from '@/components/gravitee/ApiDocs';
+import { SettingsSheet } from '@/components/gravitee/SettingsSheet';
 import { useState } from 'react';
 import type { Collection, KeyValuePair } from '@/types/api';
 import type { Environment } from '@/lib/variables';
@@ -34,6 +35,7 @@ export function GraviteeTopBar({
   const [runnerOpen, setRunnerOpen] = useState(false);
   const [mockOpen, setMockOpen] = useState(false);
   const [apiDocsOpen, setApiDocsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const handleExport = () => {
     const json = exportToJSON(collections);
     const blob = new Blob([json], { type: 'application/json' });
@@ -149,6 +151,8 @@ export function GraviteeTopBar({
         <Button
           variant="ghost"
           size="icon"
+          onClick={() => setSettingsOpen(true)}
+          aria-label="Settings"
           className="text-muted-foreground hover:text-foreground h-8 w-8"
         >
           <Settings className="w-3.5 h-3.5" />
@@ -164,6 +168,7 @@ export function GraviteeTopBar({
       />
       <MockServer open={mockOpen} onOpenChange={setMockOpen} collections={collections} />
       <ApiDocs open={apiDocsOpen} onOpenChange={setApiDocsOpen} collections={collections} />
+      <SettingsSheet open={settingsOpen} onOpenChange={setSettingsOpen} />
     </header>
   );
 }

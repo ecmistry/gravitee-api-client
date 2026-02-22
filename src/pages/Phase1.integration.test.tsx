@@ -5,7 +5,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
+import { WorkspaceProvider } from '@/contexts/WorkspaceContext';
 import Index from './Index';
+
+const TestWrapper = ({ children }: { children: React.ReactNode }) => (
+  <BrowserRouter><WorkspaceProvider>{children}</WorkspaceProvider></BrowserRouter>
+);
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -25,46 +30,46 @@ describe('Phase 1 - Index page', () => {
   });
 
   it('renders Gravitee API Client header', () => {
-    render(<BrowserRouter><Index /></BrowserRouter>);
+    render(<TestWrapper><Index /></TestWrapper>);
     expect(screen.getByText('Gravitee')).toBeInTheDocument();
     expect(screen.getByText('API Client')).toBeInTheDocument();
   });
 
   it('renders Request Builder with method selector (GET)', () => {
-    render(<BrowserRouter><Index /></BrowserRouter>);
+    render(<TestWrapper><Index /></TestWrapper>);
     expect(screen.getByText('GET')).toBeInTheDocument();
   });
 
   it('renders URL input', () => {
-    render(<BrowserRouter><Index /></BrowserRouter>);
+    render(<TestWrapper><Index /></TestWrapper>);
     expect(screen.getByPlaceholderText(/api\.example\.com/)).toBeInTheDocument();
   });
 
   it('renders Send and Save buttons', () => {
-    render(<BrowserRouter><Index /></BrowserRouter>);
+    render(<TestWrapper><Index /></TestWrapper>);
     expect(screen.getByRole('button', { name: /send/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /save/i })).toBeInTheDocument();
   });
 
   it('renders Params, Headers, Body tabs', () => {
-    render(<BrowserRouter><Index /></BrowserRouter>);
+    render(<TestWrapper><Index /></TestWrapper>);
     expect(screen.getByRole('tab', { name: /params/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /headers/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /body/i })).toBeInTheDocument();
   });
 
   it('renders New Collection button in sidebar', () => {
-    render(<BrowserRouter><Index /></BrowserRouter>);
+    render(<TestWrapper><Index /></TestWrapper>);
     expect(screen.getByRole('button', { name: /new collection/i })).toBeInTheDocument();
   });
 
   it('renders History section', () => {
-    render(<BrowserRouter><Index /></BrowserRouter>);
+    render(<TestWrapper><Index /></TestWrapper>);
     expect(screen.getByText(/history/i)).toBeInTheDocument();
   });
 
   it('shows request tabs', () => {
-    render(<BrowserRouter><Index /></BrowserRouter>);
+    render(<TestWrapper><Index /></TestWrapper>);
     expect(screen.getByText('Untitled Request').closest('div')).toBeInTheDocument();
   });
 });

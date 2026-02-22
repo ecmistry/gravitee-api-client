@@ -5,7 +5,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
+import { WorkspaceProvider } from '@/contexts/WorkspaceContext';
 import Index from './Index';
+
+const TestWrapper = ({ children }: { children: React.ReactNode }) => (
+  <BrowserRouter><WorkspaceProvider>{children}</WorkspaceProvider></BrowserRouter>
+);
 
 const localStorageMock = (() => {
   let store: Record<string, string> = {};
@@ -24,12 +29,12 @@ describe('Phase 4 - Index page', () => {
   });
 
   it('renders Pre-request tab in Request Builder', () => {
-    render(<BrowserRouter><Index /></BrowserRouter>);
+    render(<TestWrapper><Index /></TestWrapper>);
     expect(screen.getByRole('tab', { name: /pre-request/i })).toBeInTheDocument();
   });
 
   it('renders Tests tab in Request Builder', () => {
-    render(<BrowserRouter><Index /></BrowserRouter>);
+    render(<TestWrapper><Index /></TestWrapper>);
     expect(screen.getByRole('tab', { name: /^tests$/i })).toBeInTheDocument();
   });
 });

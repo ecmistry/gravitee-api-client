@@ -9,22 +9,29 @@ import { SSEClient } from '@/components/gravitee/SSEClient';
 import { SocketIOClient } from '@/components/gravitee/SocketIOClient';
 import { GraphQLClient } from '@/components/gravitee/GraphQLClient';
 import { EnvironmentSelector } from '@/components/gravitee/EnvironmentSelector';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { getCollections, setCollections as saveCollections } from '@/lib/workspaceStorage';
 import { getEnvironments, setEnvironments, getActiveEnvironmentId, setActiveEnvironmentId, getGlobalVariables, setGlobalVariables } from '@/lib/variables';
 import { getAllRequestsFromCollections, findRequestLocation } from '@/lib/collections';
 import type { Collection, ApiRequest, ApiResponse, RequestType } from '@/types/api';
 
 const Index = () => {
-  const [collections, setCollections] = useState<Collection[]>(() => {
-    const saved = localStorage.getItem('api-client-collections');
-    if (saved) {
-      try { return JSON.parse(saved); } catch { /* ignore */ }
-    }
-    return [{ id: 'default', name: 'My Workspace', folders: [], requests: [] }];
-  });
+  const { activeWorkspaceId } = useWorkspace();
+  const [collections, setCollectionsState] = useState<Collection[]>(
+    () => getCollections(activeWorkspaceId)
+  );
 
   useEffect(() => {
-    localStorage.setItem('api-client-collections', JSON.stringify(collections));
-  }, [collections]);
+    setCollectionsState(getCollections(activeWorkspaceId));
+  }, [activeWorkspaceId]);
+
+  const setCollections = (next: Collection[] | ((prev: Collection[]) => Collection[])) => {
+    setCollectionsState((prev) => {
+      const nextVal = typeof next === 'function' ? next(prev) : next;
+      saveCollections(activeWorkspaceId, nextVal);
+      return nextVal;
+    });
+  };
 
   const defaultRequest: ApiRequest = {
     id: 'temp',

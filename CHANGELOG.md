@@ -354,3 +354,51 @@
 - **apiDocs.test.ts**: collectionToOpenAPI, collectionToStaticHTML
 - **ApiDocs.test.tsx**: Dialog, Export buttons, collection selector
 - **Phase9.integration.test.tsx**: API Docs button, dialog open
+
+---
+
+## Phase 10 — Workspaces & Collaboration (Local-First Foundation)
+
+### User Accounts (Placeholder)
+
+| Feature | Status |
+|--------|--------|
+| Sign up / login (backend required) | Placeholder UI in Settings |
+| User profile in Settings | Placeholder (Sign in when backend available) |
+| API key management | Note: Future with backend |
+
+### Workspaces
+
+| Feature | Status |
+|--------|--------|
+| Personal workspace (default) | Done |
+| Multiple workspaces (add, rename, remove) | Done |
+| Workspace switcher in sidebar | Done |
+| Team workspaces | Structure ready; sharing requires backend |
+
+### Collaboration & Activity
+
+| Feature | Status |
+|--------|--------|
+| Activity log (who changed what, when) | Done (local; actor "You") |
+| Create/update/delete events for collections, folders, requests | Done |
+| Role-based access (Viewer, Editor, Admin) | Types ready; enforcement requires backend |
+
+### Sync & Conflict Resolution
+
+| Feature | Status |
+|--------|--------|
+| Cloud sync | Requires backend |
+| Conflict resolution | Types ready; sync engine deferred |
+
+### Implementation Notes
+
+- **Local-first**: All workspace data, collections, and activity stored in localStorage per workspace.
+- **Migration**: Legacy `api-client-collections` migrated to `gravitee-collections-personal` on first load.
+- **Settings sheet**: Workspaces tab (switch, add, rename, remove), Profile tab (placeholder), Activity tab (recent changes).
+
+### Tests (Phase 10)
+
+- **workspaces.test.ts**: getWorkspaces, setWorkspaces, active workspace, add/rename/remove, getActivity, logActivity
+- **workspaceStorage.test.ts**: getCollections, setCollections per workspace, legacy migration, logCollectionActivity
+- **Phase10.integration.test.tsx**: Workspace switcher in sidebar, Settings button opens sheet with Workspaces/Profile/Activity tabs
