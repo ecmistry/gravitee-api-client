@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { detectFormat, exportToJSON, exportToOpenAPI, exportToPostman, importFromPostman, importFromInsomnia } from './importExport';
+import { detectFormat, exportToJSON, exportToOpenAPI, exportToPostman, importFromPostman, importFromInsomnia, parseSpecText } from './importExport';
 import type { Collection } from '@/types/api';
 
 describe('importExport', () => {
@@ -51,6 +51,22 @@ describe('importExport', () => {
       expect(parsed.info.schema).toContain('v2.1.0');
       expect(parsed.item).toBeDefined();
     });
+
+    it('exportToPostman includes request body and params', () => {
+      const cols = [{
+        id: 'c1', name: 'API', folders: [],
+        requests: [{
+          id: 'r1', name: 'Create', method: 'POST', url: 'https://api.example.com/users',
+          params: [{ key: 'limit', value: '10', enabled: true }],
+          headers: [{ key: 'Content-Type', value: 'application/json', enabled: true }],
+          body: '{"name":"test"}', bodyType: 'json' as const,
+        }],
+      }];
+      const out = exportToPostman(cols);
+      const parsed = JSON.parse(out);
+      expect(parsed.item[0].request.body.raw).toBe('{"name":"test"}');
+      expect(parsed.item[0].request.header).toHaveLength(1);
+    });
   });
 
   describe('exportToJSON', () => {
@@ -59,6 +75,18 @@ describe('importExport', () => {
       const json = exportToJSON(cols);
       expect(() => JSON.parse(json)).not.toThrow();
       expect(JSON.parse(json)).toEqual(cols);
+    });
+  });
+
+  describe('parseSpecText', () => {
+    it('parses JSON string', async () => {
+      const out = await parseSpecText('{"openapi":"3.0.0","info":{},"paths":{}}');
+      expect(out).toEqual({ openapi: '3.0.0', info: {}, paths: {} });
+    });
+
+    it('parses YAML string', async () => {
+      const out = await parseSpecText('openapi: "3.0.0"\ninfo:\n  title: Test\npaths: {}');
+      expect(out).toMatchObject({ openapi: '3.0.0', info: { title: 'Test' }, paths: {} });
     });
   });
 
@@ -77,6 +105,21 @@ describe('importExport', () => {
       expect(result[0].requests).toHaveLength(1);
       expect(result[0].requests[0].method).toBe('GET');
       expect(result[0].requests[0].url).toBe('https://api.example.com/users');
+    });
+
+    it('imports postman collection with folders', () => {
+      const data = {
+        info: { name: 'API' },
+        item: [
+          { name: 'Root Request', request: { method: 'POST', url: 'https://api.example.com/create', header: [], body: {} } },
+          { name: 'Users', item: [{ name: 'List', request: { method: 'GET', url: 'https://api.example.com/users', header: [], body: {} } }] },
+        ],
+      };
+      const result = importFromPostman(data);
+      expect(result[0].requests).toHaveLength(1);
+      expect(result[0].folders).toHaveLength(1);
+      expect(result[0].folders[0].name).toBe('Users');
+      expect(result[0].folders[0].requests).toHaveLength(1);
     });
   });
 

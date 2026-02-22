@@ -477,5 +477,5 @@
 
 - **openApiImport.test.ts**: isOpenAPI3, isSwagger2, importFromOpenAPI3, importFromSwagger2
 - **openApiValidation.test.ts**: validateOpenAPI, hasValidationErrors
-- **importExport.test.ts**: detectFormat openapi/swagger, exportToOpenAPI, exportToPostman
+- **importExport.test.ts**: detectFormat, parseSpecText (JSON/YAML), exportToOpenAPI, exportToPostman (with body/params), importFromPostman (folders)
 - **Phase12.integration.test.tsx**: Import/Export buttons, Export dropdown format options
