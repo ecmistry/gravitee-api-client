@@ -21,6 +21,9 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 
 
 export type BodyType = 'none' | 'json' | 'xml' | 'text' | 'html' | 'form-data' | 'form-urlencoded';
 
+/** Request type: HTTP, WebSocket, SSE, or Socket.IO */
+export type RequestType = 'http' | 'websocket' | 'sse' | 'socketio';
+
 /** Auth inheritance: use own auth, or inherit from folder/collection */
 export type AuthInheritance = 'inherit' | 'none'; // inherit = use parent, none = use request's own auth
 
@@ -28,6 +31,8 @@ export interface ApiRequest {
   id: string;
   name: string;
   description?: string;
+  /** Request type: HTTP, WebSocket, or SSE. Default http for backwards compat. */
+  requestType?: RequestType;
   method: HttpMethod;
   url: string;
   params: KeyValuePair[];

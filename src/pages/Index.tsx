@@ -4,10 +4,13 @@ import { GraviteeSidebar } from '@/components/gravitee/GraviteeSidebar';
 import { RequestBuilder } from '@/components/gravitee/RequestBuilder';
 import { RequestTabs } from '@/components/gravitee/RequestTabs';
 import { ResponseViewer } from '@/components/gravitee/ResponseViewer';
+import { WebSocketClient } from '@/components/gravitee/WebSocketClient';
+import { SSEClient } from '@/components/gravitee/SSEClient';
+import { SocketIOClient } from '@/components/gravitee/SocketIOClient';
 import { EnvironmentSelector } from '@/components/gravitee/EnvironmentSelector';
 import { getEnvironments, setEnvironments, getActiveEnvironmentId, setActiveEnvironmentId, getGlobalVariables, setGlobalVariables } from '@/lib/variables';
 import { getAllRequestsFromCollections, findRequestLocation } from '@/lib/collections';
-import type { Collection, ApiRequest, ApiResponse } from '@/types/api';
+import type { Collection, ApiRequest, ApiResponse, RequestType } from '@/types/api';
 
 const Index = () => {
   const [collections, setCollections] = useState<Collection[]>(() => {
@@ -196,22 +199,77 @@ const Index = () => {
             onRenameTab={renameTab}
             isDirty={isDirty}
           />
-          <RequestBuilder
-            request={activeRequest}
-            setRequest={setRequest}
-            setResponse={setResponse}
-            setTestResults={setTestResultsForTab}
-            loading={loading}
-            setLoading={setLoading}
-            onSaveRequest={handleSaveRequest}
-            activeEnvId={activeEnvId}
-            environments={environments}
-            globalVars={globalVars}
-            inheritedAuth={inheritedAuth}
-            canInherit={canInherit}
-            inheritedAuthLabel={inheritedAuthLabel}
-          />
-          <ResponseViewer response={response} loading={loading} testResults={testResults[activeTabId] ?? []} />
+          <div className="flex items-center gap-1 px-5 py-1.5 border-b border-border bg-card shrink-0">
+            {(['http', 'websocket', 'sse', 'socketio'] as const).map((t) => {
+              const current = (activeRequest.requestType ?? 'http') === t;
+              const label = t === 'http' ? 'HTTP' : t === 'websocket' ? 'WebSocket' : t === 'sse' ? 'SSE' : 'Socket.IO';
+              return (
+                <button
+                  key={t}
+                  onClick={() => setRequest({ ...activeRequest, requestType: t })}
+                  className={`px-3 py-1 text-xs font-medium rounded transition-colors ${current ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          {(() => {
+            const reqType: RequestType = activeRequest.requestType ?? 'http';
+            if (reqType === 'websocket') {
+              return (
+                <WebSocketClient
+                  request={activeRequest}
+                  setRequest={setRequest}
+                  activeEnvId={activeEnvId}
+                  environments={environments}
+                  globalVars={globalVars}
+                />
+              );
+            }
+            if (reqType === 'sse') {
+              return (
+                <SSEClient
+                  request={activeRequest}
+                  setRequest={setRequest}
+                  activeEnvId={activeEnvId}
+                  environments={environments}
+                  globalVars={globalVars}
+                />
+              );
+            }
+            if (reqType === 'socketio') {
+              return (
+                <SocketIOClient
+                  request={activeRequest}
+                  setRequest={setRequest}
+                  activeEnvId={activeEnvId}
+                  environments={environments}
+                  globalVars={globalVars}
+                />
+              );
+            }
+            return (
+              <>
+                <RequestBuilder
+                  request={activeRequest}
+                  setRequest={setRequest}
+                  setResponse={setResponse}
+                  setTestResults={setTestResultsForTab}
+                  loading={loading}
+                  setLoading={setLoading}
+                  onSaveRequest={handleSaveRequest}
+                  activeEnvId={activeEnvId}
+                  environments={environments}
+                  globalVars={globalVars}
+                  inheritedAuth={inheritedAuth}
+                  canInherit={canInherit}
+                  inheritedAuthLabel={inheritedAuthLabel}
+                />
+                <ResponseViewer response={response} loading={loading} testResults={testResults[activeTabId] ?? []} />
+              </>
+            );
+          })()}
         </div>
       </div>
     </div>

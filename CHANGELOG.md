@@ -203,3 +203,50 @@
 - **collectionRunner.test.ts**: `parseCSV`, `parseJSONData`, `parseDataFile`, `exportRunResultJSON`, `exportRunResultHTML`
 - **Phase5.integration.test.tsx**: Run Collection button, Collection Runner dialog
 - **CollectionRunner.test.tsx**: Dialog configuration, Run button, closed state
+
+---
+
+## Phase 6 — WebSocket & SSE Support
+
+### WebSocket Client
+
+| Feature | Status |
+|--------|--------|
+| Connect to ws:// or wss:// URL | Done |
+| Connection status indicator (connecting / connected / disconnected) | Done |
+| Message composer with send button (text or JSON) | Done |
+| Message log showing sent vs received with timestamps | Done |
+| Custom headers tab (stored for reference; browser API does not support handshake headers) | Done |
+| Save WebSocket connections to collections | Done |
+
+### Server-Sent Events (SSE)
+
+| Feature | Status |
+|--------|--------|
+| Connect to SSE endpoint | Done |
+| Live streaming event log (event name, data, id) | Done |
+| Reconnect on disconnect | Done |
+| Filter events by type | Done |
+
+### Socket.IO (Bonus)
+
+| Feature | Status |
+|--------|--------|
+| Connect to Socket.IO server | Done |
+| Emit events with JSON payload | Done |
+| Listen to all events with filter | Done |
+
+### Request Type Switching
+
+| Feature | Status |
+|--------|--------|
+| HTTP / WebSocket / SSE / Socket.IO type selector | Done |
+| Save WebSocket, SSE, Socket.IO configs to collections | Done |
+| Collection Runner skips non-HTTP requests | Done |
+
+### Tests (Phase 6)
+
+- **Phase6.integration.test.tsx**: Request type selectors (HTTP, WebSocket, SSE, Socket.IO), WebSocket client UI, SSE client UI, Socket.IO client UI
+- **WebSocketClient.test.tsx**: URL input, Connect button, Messages/Headers tabs, Send button
+- **SSEClient.test.tsx**: URL input, Connect button, reconnect checkbox, event filter
+- **SocketIOClient.test.tsx**: URL input, Connect button, Emit section, event filter

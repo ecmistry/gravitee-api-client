@@ -50,11 +50,10 @@ interface CollectionRunnerProps {
 type RunTarget = { type: 'collection'; collection: Collection } | { type: 'folder'; collection: Collection; folderId: string };
 
 function getRequestsFromTarget(target: RunTarget): ApiRequest[] {
-  if (target.type === 'folder') {
-    const folder = target.collection.folders.find(f => f.id === target.folderId);
-    return folder?.requests ?? [];
-  }
-  return getAllRequests(target.collection);
+  const raw = target.type === 'folder'
+    ? (target.collection.folders.find(f => f.id === target.folderId)?.requests ?? [])
+    : getAllRequests(target.collection);
+  return raw.filter(r => (r.requestType ?? 'http') === 'http');
 }
 
 export function CollectionRunner({
