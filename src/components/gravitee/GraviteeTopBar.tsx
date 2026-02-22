@@ -1,4 +1,4 @@
-import { Upload, Download, Settings, Play, Server, FileText } from 'lucide-react';
+import { Upload, Download, Settings, Play, Server, FileText, Activity } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { exportToJSON, detectFormat, importFromPostman, importFromInsomnia } from '@/lib/importExport';
 import { EnvironmentSelector } from '@/components/gravitee/EnvironmentSelector';
@@ -6,6 +6,7 @@ import { CollectionRunner } from '@/components/gravitee/CollectionRunner';
 import { MockServer } from '@/components/gravitee/MockServer';
 import { ApiDocs } from '@/components/gravitee/ApiDocs';
 import { SettingsSheet } from '@/components/gravitee/SettingsSheet';
+import { MonitoringSheet } from '@/components/gravitee/MonitoringSheet';
 import { useState } from 'react';
 import type { Collection, KeyValuePair } from '@/types/api';
 import type { Environment } from '@/lib/variables';
@@ -36,6 +37,7 @@ export function GraviteeTopBar({
   const [mockOpen, setMockOpen] = useState(false);
   const [apiDocsOpen, setApiDocsOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [monitoringOpen, setMonitoringOpen] = useState(false);
   const handleExport = () => {
     const json = exportToJSON(collections);
     const blob = new Blob([json], { type: 'application/json' });
@@ -117,6 +119,15 @@ export function GraviteeTopBar({
           <FileText className="w-3.5 h-3.5 mr-1.5" />
           API Docs
         </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setMonitoringOpen(true)}
+          className="text-muted-foreground hover:text-foreground h-8 px-3 text-xs"
+        >
+          <Activity className="w-3.5 h-3.5 mr-1.5" />
+          Monitoring
+        </Button>
         <div className="w-px h-4 bg-border" />
         {onEnvironmentsChange ? (
           <EnvironmentSelector
@@ -169,6 +180,13 @@ export function GraviteeTopBar({
       <MockServer open={mockOpen} onOpenChange={setMockOpen} collections={collections} />
       <ApiDocs open={apiDocsOpen} onOpenChange={setApiDocsOpen} collections={collections} />
       <SettingsSheet open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <MonitoringSheet
+        open={monitoringOpen}
+        onOpenChange={setMonitoringOpen}
+        collections={collections}
+        environments={environments}
+        globalVars={globalVars}
+      />
     </header>
   );
 }

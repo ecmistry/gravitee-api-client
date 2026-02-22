@@ -402,3 +402,43 @@
 - **workspaces.test.ts**: getWorkspaces, setWorkspaces, active workspace, add/rename/remove, getActivity, logActivity
 - **workspaceStorage.test.ts**: getCollections, setCollections per workspace, legacy migration, logCollectionActivity
 - **Phase10.integration.test.tsx**: Workspace switcher in sidebar, Settings button opens sheet with Workspaces/Profile/Activity tabs
+
+---
+
+## Phase 11 — Monitoring & Scheduled Runs
+
+### Monitors
+
+| Feature | Status |
+|--------|--------|
+| Schedule collection to run every 5m/15m/1h/6h/1d | Done |
+| Select environment per monitor | Done |
+| Run collection or folder | Done |
+| Alert thresholds: max response time, min status code, test failures | Done (structure) |
+| Run now (manual trigger) | Done |
+
+### Results Dashboard
+
+| Feature | Status |
+|--------|--------|
+| Run history timeline with pass/fail per run | Done |
+| Per-request breakdown per run | Done |
+| Trend graph (response time over time) | Done |
+
+### Alerting
+
+| Feature | Status |
+|--------|--------|
+| Webhook notifications (POST to Slack, etc.) on failure | Done |
+| Email notifications | Placeholder (requires backend) |
+
+### Implementation Notes
+
+- Monitors run only when the app tab is open; no background execution.
+- Run history stored in localStorage (last 500 runs).
+- Workspace-scoped monitors; run history is global.
+
+### Tests (Phase 11)
+
+- **monitors.test.ts**: getMonitors, setMonitors, add/update/remove, getRunHistory, addRunRecord, getIntervalMs
+- **Phase11.integration.test.tsx**: Monitoring button in top bar, opens sheet with Monitors and Results tabs
