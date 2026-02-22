@@ -61,7 +61,8 @@ export async function introspectSchema(
   headers: Record<string, string> = {}
 ): Promise<IntrospectionSchema | null> {
   try {
-    const res = import.meta.env.DEV
+    const useProxy = import.meta.env.DEV || import.meta.env.VITE_USE_CORS_PROXY === "true";
+    const res = useProxy
       ? await fetch('/api-proxy', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -97,7 +98,8 @@ export async function executeGraphQL(
 ): Promise<{ data: unknown; errors?: Array<{ message: string }>; status: number }> {
   const payload = { query, variables: variables ?? undefined, operationName: operationName || undefined };
   try {
-    const res = import.meta.env.DEV
+    const useProxy = import.meta.env.DEV || import.meta.env.VITE_USE_CORS_PROXY === "true";
+    const res = useProxy
       ? await fetch('/api-proxy', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

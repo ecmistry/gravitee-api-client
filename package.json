@@ -10,6 +10,7 @@
     "lint": "eslint .",
     "mock": "tsx scripts/mock-server.ts",
     "preview": "vite preview",
+    "serve": "node scripts/serve.mjs",
     "test": "vitest run",
     "test:watch": "vitest"
   },

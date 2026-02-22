@@ -134,7 +134,8 @@ export function RequestBuilder({ request, setRequest, setResponse, setTestResult
         }
       }
 
-      const res = import.meta.env.DEV
+      const useProxy = import.meta.env.DEV || import.meta.env.VITE_USE_CORS_PROXY === "true";
+      const res = useProxy
         ? await fetch('/api-proxy', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

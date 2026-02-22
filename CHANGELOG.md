@@ -479,3 +479,22 @@
 - **openApiValidation.test.ts**: validateOpenAPI, hasValidationErrors
 - **importExport.test.ts**: detectFormat, parseSpecText (JSON/YAML), exportToOpenAPI, exportToPostman (with body/params), importFromPostman (folders)
 - **Phase12.integration.test.tsx**: Import/Export buttons, Export dropdown format options
+
+---
+
+## Docker Deployment
+
+### Docker Support
+
+| Feature | Status |
+|--------|--------|
+| Multi-stage Dockerfile (Node 20 Alpine) | Done |
+| Production server with static files + CORS proxy | Done |
+| docker-compose.yml for one-command startup | Done |
+| CORS proxy enabled in Docker builds (VITE_USE_CORS_PROXY) | Done |
+
+### Usage
+
+- Build: `docker build -t gravitee-api-client .`
+- Run: `docker run -p 3000:3000 gravitee-api-client`
+- Or: `docker compose up --build`
