@@ -1,40 +1,28 @@
 # Gravitee API Client
 
-An API testing client for Gravitee API Management—similar to Postman and Insomnia. Test and debug your APIs with collections, environments, and import/export support.
+An API test client for Gravitee.io. Send requests, organize collections, and explore your APIs.
 
-## Run Locally
+## Getting Started
 
-```bash
+```sh
 pnpm install
-pnpm dev
+pnpm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+The app runs at [http://localhost:3000](http://localhost:3000).
 
-## Features
+## Build
 
-- **Collections & Requests** — Organize APIs into collections with folders
-- **Import/Export** — Supports Postman and Insomnia collection formats
-- **Params, Headers, Body** — Full request customization
-- **Response Viewer** — Status, headers, timing, and formatted body/JSON
-- **History** — Recent requests persisted (last 50)
-
-## Scripts
-
-| Command | Description |
-|---------|-------------|
-| `pnpm dev` | Start development server (port 3000) |
-| `pnpm build` | Production build → `dist/public` |
-| `pnpm preview` | Preview production build locally |
+```sh
+pnpm run build
+pnpm run preview
+```
 
 ## Tech Stack
 
-- React 19 + Vite 6
-- Tailwind CSS 4 + shadcn/ui
+- React 18
 - TypeScript
-- lucide-react (icons)
-- sonner (toasts)
-
-## Code Review
-
-See [CODE_REVIEW.md](./CODE_REVIEW.md) for a detailed review, architecture notes, and improvement recommendations.
+- Vite
+- Tailwind CSS
+- shadcn/ui
+- React Router
