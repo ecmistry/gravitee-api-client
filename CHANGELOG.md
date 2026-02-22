@@ -318,3 +318,39 @@
 
 - **mockServer.test.ts**: matchPath, matchQuery, selectExample, findMatchingRoute, getPathFromUrl, toPathPattern
 - **MockServer.test.tsx**: Dialog, collection selector, Apply/Stop buttons
+
+---
+
+## Phase 9 — API Documentation Generator
+
+### Documentation View
+
+| Feature | Status |
+|--------|--------|
+| Auto-generate docs from collection + request descriptions + examples | Done |
+| Sidebar navigation by folder/request | Done |
+| Display: method badge, endpoint URL, description, parameters, headers, body schema | Done |
+| Example request/response from history or body | Done |
+
+### Markdown Support
+
+| Feature | Status |
+|--------|--------|
+| Rich text descriptions on collections | Done |
+| Rich text descriptions on folders | Done |
+| Rich text descriptions on requests | Done (existing) |
+
+### Export / Publish
+
+| Feature | Status |
+|--------|--------|
+| Export as static HTML site | Done |
+| Export as OpenAPI 3.0 JSON | Done |
+| Export as OpenAPI 3.0 YAML | Done |
+| Shareable link (host exported HTML on static host) | Note: Host on Vercel, Netlify, GitHub Pages, etc. |
+
+### Tests (Phase 9)
+
+- **apiDocs.test.ts**: collectionToOpenAPI, collectionToStaticHTML
+- **ApiDocs.test.tsx**: Dialog, Export buttons, collection selector
+- **Phase9.integration.test.tsx**: API Docs button, dialog open

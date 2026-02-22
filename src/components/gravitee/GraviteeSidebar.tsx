@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, Plus, ChevronDown, ChevronRight, Folder, FolderOpen, Pencil, Trash2, History, X, Copy, GripVertical, Shield } from 'lucide-react';
+import { Search, Plus, ChevronDown, ChevronRight, Folder, FolderOpen, Pencil, Trash2, History, X, Copy, GripVertical, Shield, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -55,6 +55,7 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const history = getHistory();
   const [authSheetTarget, setAuthSheetTarget] = useState<{ type: 'collection'; collection: Collection } | { type: 'folder'; folder: Folder; collectionId: string } | null>(null);
+  const [descSheetTarget, setDescSheetTarget] = useState<{ type: 'collection'; collection: Collection } | { type: 'folder'; folder: Folder; collectionId: string } | null>(null);
   const [contextMenu, setContextMenu] = useState<{
     type: 'request';
     request: ApiRequest;
@@ -668,6 +669,9 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
           )}
           {contextMenu.type === 'collection' && (
             <>
+              <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs outline-none hover:bg-accent hover:text-accent-foreground" onClick={() => { setDescSheetTarget({ type: 'collection', collection: contextMenu.collection }); setContextMenu(null); }}>
+                <FileText className="w-3.5 h-3.5" /> Edit description
+              </button>
               <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs outline-none hover:bg-accent hover:text-accent-foreground" onClick={() => { setAuthSheetTarget({ type: 'collection', collection: contextMenu.collection }); setContextMenu(null); }}>
                 <Shield className="w-3.5 h-3.5" /> Set auth
               </button>
@@ -694,6 +698,37 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
           )}
         </div>
       )}
+
+      {/* Description sheet for collection/folder */}
+      <Sheet open={!!descSheetTarget} onOpenChange={(open) => !open && setDescSheetTarget(null)}>
+        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>{descSheetTarget?.type === 'collection' ? `Description: ${descSheetTarget.collection.name}` : descSheetTarget ? `Description: ${descSheetTarget.folder.name}` : 'Description'}</SheetTitle>
+          </SheetHeader>
+          {descSheetTarget && (
+            <div className="mt-4">
+              <p className="text-xs text-muted-foreground mb-2">Markdown supported</p>
+              <Textarea
+                className="min-h-[200px] font-mono text-sm"
+                placeholder="Describe this collection/folder..."
+                value={
+                  descSheetTarget.type === 'collection'
+                    ? (collections.find(c => c.id === descSheetTarget.collection.id)?.description ?? '')
+                    : (collections.find(c => c.id === descSheetTarget.collectionId)?.folders.find(f => f.id === descSheetTarget.folder.id)?.description ?? '')
+                }
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (descSheetTarget.type === 'collection') {
+                    setCollections(collections.map(c => c.id === descSheetTarget.collection.id ? { ...c, description: val } : c));
+                  } else {
+                    setCollections(collections.map(c => c.id === descSheetTarget.collectionId ? { ...c, folders: c.folders.map(f => f.id === descSheetTarget.folder.id ? { ...f, description: val } : f) } : c));
+                  }
+                }}
+              />
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
 
       {/* Auth config sheet for collection/folder */}
       <Sheet open={!!authSheetTarget} onOpenChange={(open) => !open && setAuthSheetTarget(null)}>

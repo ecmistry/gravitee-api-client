@@ -3,6 +3,7 @@ import type { AuthConfig } from './auth';
 export interface Collection {
   id: string;
   name: string;
+  description?: string;
   folders: Folder[];
   requests: ApiRequest[];
   /** Auth inherited by requests that choose "Inherit from Parent" */
@@ -12,6 +13,7 @@ export interface Collection {
 export interface Folder {
   id: string;
   name: string;
+  description?: string;
   requests: ApiRequest[];
   /** Auth inherited by requests (overrides collection auth when set) */
   auth?: AuthConfig;
