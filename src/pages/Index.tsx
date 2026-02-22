@@ -37,13 +37,28 @@ const Index = () => {
       const newReq = {
         ...activeRequest,
         id: `req-${Date.now()}`,
-        name: activeRequest.url ? (() => { try { return new URL(activeRequest.url).pathname; } catch { return 'New Request'; } })() : 'New Request'
+        name: activeRequest.name || 'New Request'
       };
-      setCollections(collections.map(col =>
-        col.id === 'default'
-          ? { ...col, requests: [...col.requests, newReq] }
-          : col
-      ));
+      // Find the collection that contains this temp request and replace it there
+      const collectionWithTemp = collections.find(col =>
+        col.requests.some(r => r.id === activeRequest.id)
+      );
+      setCollections(collections.map(col => {
+        const hasTemp = col.requests.some(r => r.id === activeRequest.id);
+        if (hasTemp) {
+          return {
+            ...col,
+            requests: col.requests.map(r =>
+              r.id === activeRequest.id ? newReq : r
+            )
+          };
+        }
+        // Temp not in any collection (e.g. initial state) → add to first collection
+        if (!collectionWithTemp && col === collections[0]) {
+          return { ...col, requests: [...col.requests, newReq] };
+        }
+        return col;
+      }));
       setActiveRequest(newReq);
     } else {
       setCollections(collections.map(col => ({
