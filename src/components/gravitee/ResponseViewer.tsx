@@ -6,9 +6,16 @@ import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import type { ApiResponse } from '@/types/api';
 
+export interface TestResult {
+  name: string;
+  passed: boolean;
+  error?: string;
+}
+
 interface ResponseViewerProps {
   response: ApiResponse | null;
   loading: boolean;
+  testResults?: TestResult[];
 }
 
 function formatResponseBody(data: unknown, pretty: boolean): string {
@@ -20,7 +27,7 @@ function formatResponseBody(data: unknown, pretty: boolean): string {
   }
 }
 
-export function ResponseViewer({ response, loading }: ResponseViewerProps) {
+export function ResponseViewer({ response, loading, testResults = [] }: ResponseViewerProps) {
   const [bodyView, setBodyView] = useState<'pretty' | 'raw' | 'preview'>('pretty');
   const [copied, setCopied] = useState(false);
 
@@ -118,6 +125,14 @@ export function ResponseViewer({ response, loading }: ResponseViewerProps) {
             className="data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary text-muted-foreground text-xs h-9 px-4 rounded-none">
             Headers
           </TabsTrigger>
+          <TabsTrigger value="tests"
+            className="data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:border-b-2 data-[state=active]:border-primary text-muted-foreground text-xs h-9 px-4 rounded-none">
+            Tests {testResults.length > 0 && (
+              <span className={`ml-1 font-semibold ${testResults.every(r => r.passed) ? 'text-status-success' : 'text-status-client-error'}`}>
+                ({testResults.filter(r => r.passed).length}/{testResults.length})
+              </span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="body" className="flex-1 flex flex-col overflow-hidden m-0">
@@ -172,6 +187,35 @@ export function ResponseViewer({ response, loading }: ResponseViewerProps) {
               </div>
             ))}
           </div>
+        </TabsContent>
+
+        <TabsContent value="tests" className="flex-1 p-4 overflow-auto m-0">
+          {testResults.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground text-xs">
+              Add test scripts in the Tests tab of the request and send to see results.
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {testResults.map((r, i) => (
+                <div
+                  key={i}
+                  className={`flex items-start gap-3 p-3 rounded-lg border ${r.passed ? 'bg-status-success/5 border-status-success/20' : 'bg-status-client-error/5 border-status-client-error/20'}`}
+                >
+                  {r.passed ? (
+                    <CheckCircle2 className="w-4 h-4 text-status-success shrink-0 mt-0.5" />
+                  ) : (
+                    <XCircle className="w-4 h-4 text-status-client-error shrink-0 mt-0.5" />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <span className={`font-medium text-xs ${r.passed ? 'text-status-success' : 'text-status-client-error'}`}>
+                      {r.name}
+                    </span>
+                    {r.error && <p className="text-xs text-muted-foreground mt-1 break-words">{r.error}</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </TabsContent>
       </Tabs>
     </motion.div>

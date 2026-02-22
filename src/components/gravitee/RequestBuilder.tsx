@@ -5,9 +5,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { saveToHistory } from '@/lib/history';
+import { applyAuth } from '@/lib/auth';
+import { resolveRequestVariables } from '@/lib/variables';
+import { runPreRequestScript, runTestScript } from '@/lib/scripting';
 import { motion } from 'framer-motion';
 import type { ApiRequest, ApiResponse, BodyType, HttpMethod } from '@/types/api';
+import type { Environment } from '@/lib/variables';
+import type { KeyValuePair } from '@/types/api';
+import type { AuthConfig } from '@/types/auth';
 import { METHOD_COLORS } from '@/types/api';
+import { AuthTab } from './AuthTab';
 
 const RAW_CONTENT_TYPES: Record<string, string> = {
   json: 'application/json',
@@ -20,55 +27,92 @@ interface RequestBuilderProps {
   request: ApiRequest;
   setRequest: (request: ApiRequest) => void;
   setResponse: (response: ApiResponse | null) => void;
+  setTestResults?: (results: Array<{ name: string; passed: boolean; error?: string }>) => void;
   loading: boolean;
   setLoading: (loading: boolean) => void;
   onSaveRequest?: () => void;
+  activeEnvId?: string | null;
+  environments?: Environment[];
+  globalVars?: KeyValuePair[];
+  /** Auth from parent folder or collection when request uses "Inherit from Parent" */
+  inheritedAuth?: AuthConfig;
+  /** Whether request can inherit (in folder or collection with auth) */
+  canInherit?: boolean;
+  inheritedAuthLabel?: string;
 }
 
-export function RequestBuilder({ request, setRequest, setResponse, loading, setLoading, onSaveRequest }: RequestBuilderProps) {
-  const buildBodyAndHeaders = (): { body?: string | FormData; headers: Record<string, string> } => {
+export function RequestBuilder({ request, setRequest, setResponse, setTestResults, loading, setLoading, onSaveRequest, activeEnvId = null, environments = [], globalVars = [], inheritedAuth, canInherit = false, inheritedAuthLabel }: RequestBuilderProps) {
+  // Resolved with env/global vars only (pre-request script vars added at send time)
+  const resolvedRequest = resolveRequestVariables(request, activeEnvId, environments, globalVars);
+
+  const getEffectiveAuthConfig = (): AuthConfig | undefined => {
+    if (request.authInherit === 'inherit' && canInherit && inheritedAuth) return inheritedAuth;
+    return request.auth;
+  };
+
+  const buildBodyAndHeaders = (req: ApiRequest): { body?: string | FormData; headers: Record<string, string>; authParams: Record<string, string> } => {
     const headers: Record<string, string> = {};
-    request.headers.forEach(h => {
+    req.headers.forEach(h => {
       if (h.enabled && h.key) headers[h.key] = h.value;
     });
+    const authResult = applyAuth(getEffectiveAuthConfig());
+    Object.assign(headers, authResult.headers);
 
-    if (request.method === 'GET' || request.method === 'HEAD') return { headers };
+    if (req.method === 'GET' || req.method === 'HEAD') return { headers, authParams: authResult.params };
 
-    const bodyType = request.bodyType || 'none';
-    if (bodyType === 'none') return { headers };
+    const bodyType = req.bodyType || 'none';
+    if (bodyType === 'none') return { headers, authParams: authResult.params };
 
     if (bodyType === 'form-urlencoded') {
-      const formData = request.formData ?? [];
+      const formData = req.formData ?? [];
       const params = new URLSearchParams();
       formData.forEach(p => { if (p.enabled && p.key) params.append(p.key, p.value); });
       headers['Content-Type'] = 'application/x-www-form-urlencoded';
-      return { body: params.toString(), headers };
+      return { body: params.toString(), headers, authParams: authResult.params };
     }
 
     if (bodyType === 'form-data') {
-      const formData = request.formData ?? [];
+      const formData = req.formData ?? [];
       const fd = new FormData();
       formData.forEach(p => { if (p.enabled && p.key) fd.append(p.key, p.value); });
-      return { body: fd, headers };
+      return { body: fd, headers, authParams: authResult.params };
     }
 
     // Raw: json, xml, text, html
     if (['json', 'xml', 'text', 'html'].includes(bodyType)) {
       headers['Content-Type'] = RAW_CONTENT_TYPES[bodyType] ?? 'text/plain';
     }
-    return { body: request.body || undefined, headers };
+    return { body: req.body || undefined, headers, authParams: authResult.params };
   };
 
   const handleSend = async () => {
     setLoading(true);
+    setTestResults?.([]);
     const startTime = Date.now();
     try {
+      // Run pre-request script and merge vars
+      let scriptVars = new Map<string, string>();
+      if (request.preRequestScript?.trim()) {
+        try {
+          const sv = { environment: new Map<string, string>(), globals: new Map<string, string>() };
+          runPreRequestScript(request.preRequestScript, sv);
+          sv.environment.forEach((v, k) => scriptVars.set(k, v));
+          sv.globals.forEach((v, k) => scriptVars.set(k, v));
+        } catch (e) {
+          setResponse({ status: 0, statusText: 'Pre-request script error', headers: {}, data: { error: e instanceof Error ? e.message : String(e) }, time: 0, size: 0 });
+          setLoading(false);
+          return;
+        }
+      }
+      const toSend = resolveRequestVariables(request, activeEnvId, environments, globalVars, scriptVars);
+      const built = buildBodyAndHeaders(toSend);
       let targetUrl: string;
       try {
-        const url = new URL(request.url);
-        request.params.forEach(p => {
+        const url = new URL(toSend.url);
+        toSend.params.forEach(p => {
           if (p.enabled && p.key) url.searchParams.append(p.key, p.value);
         });
+        Object.entries(built.authParams).forEach(([k, v]) => url.searchParams.append(k, v));
         targetUrl = url.toString();
       } catch {
         setResponse({ status: 0, statusText: 'Invalid URL', headers: {}, data: { error: 'Invalid URL' }, time: 0, size: 0 });
@@ -76,15 +120,15 @@ export function RequestBuilder({ request, setRequest, setResponse, loading, setL
         return;
       }
 
-      const { body, headers } = buildBodyAndHeaders();
+      const { body, headers } = built;
 
       // Use CORS proxy in dev to avoid browser CORS restrictions
       let proxyPayload: { url: string; method: string; headers: Record<string, string>; body?: string; formData?: Array<{ key: string; value: string }> } = {
-        url: targetUrl, method: request.method, headers
+        url: targetUrl, method: toSend.method, headers
       };
-      if (request.method !== 'GET' && request.method !== 'HEAD') {
+      if (toSend.method !== 'GET' && toSend.method !== 'HEAD') {
         if (body instanceof FormData) {
-          proxyPayload.formData = request.formData?.filter(p => p.enabled && p.key).map(p => ({ key: p.key, value: p.value })) ?? [];
+          proxyPayload.formData = toSend.formData?.filter(p => p.enabled && p.key).map(p => ({ key: p.key, value: p.value })) ?? [];
         } else if (body !== undefined) {
           proxyPayload.body = body;
         }
@@ -99,7 +143,7 @@ export function RequestBuilder({ request, setRequest, setResponse, loading, setL
             const text = await r.text();
             return new Response(text, { status: r.status, statusText: r.statusText, headers: r.headers });
           })
-        : await fetch(targetUrl, { method: request.method, headers, body });
+        : await fetch(targetUrl, { method: toSend.method, headers, body });
       const endTime = Date.now();
       const contentType = res.headers.get('content-type') || '';
       let data;
@@ -120,6 +164,10 @@ export function RequestBuilder({ request, setRequest, setResponse, loading, setL
       };
       setResponse(responseData);
       saveToHistory(request, responseData);
+      if (request.testScript?.trim() && setTestResults) {
+        const results = runTestScript(request.testScript, responseData);
+        setTestResults(results);
+      }
     } catch (error) {
       setResponse({
         status: 0,
@@ -181,12 +229,17 @@ export function RequestBuilder({ request, setRequest, setResponse, loading, setL
             </SelectContent>
           </Select>
 
-          <Input
-            placeholder="https://api.example.com/users"
-            value={request.url}
-            onChange={(e) => setRequest({ ...request, url: e.target.value })}
-            className="flex-1 h-9 bg-background border-border text-foreground placeholder:text-muted-foreground font-mono text-sm focus:border-primary focus:ring-1 focus:ring-primary"
-          />
+          <div className="flex-1 flex flex-col gap-0.5 min-w-0">
+            <Input
+              placeholder="https://api.example.com/users or use {{variableName}}"
+              value={request.url}
+              onChange={(e) => setRequest({ ...request, url: e.target.value })}
+              className="h-9 bg-background border-border text-foreground placeholder:text-muted-foreground font-mono text-sm focus:border-primary focus:ring-1 focus:ring-primary"
+            />
+            {(activeEnvId || globalVars?.length) && /\{\{\w+\}\}/.test(request.url) && (
+              <span className="text-[10px] text-primary/80 font-mono">Variables will be resolved on Send</span>
+            )}
+          </div>
 
           <div className="flex gap-2 shrink-0">
             <motion.div whileTap={{ scale: 0.95 }}>
@@ -211,12 +264,22 @@ export function RequestBuilder({ request, setRequest, setResponse, loading, setL
             )}
           </div>
         </div>
+        <div className="mt-2">
+          <label className="text-[10px] text-muted-foreground uppercase tracking-wider block mb-1">Description</label>
+          <Textarea
+            placeholder="Optional description for this request"
+            value={request.description ?? ''}
+            onChange={(e) => setRequest({ ...request, description: e.target.value })}
+            className="min-h-[48px] bg-background border-border text-foreground placeholder:text-muted-foreground text-xs resize-none"
+            rows={2}
+          />
+        </div>
       </div>
 
       {/* Tabs */}
       <Tabs defaultValue="params">
         <TabsList className="w-full justify-start gap-0 rounded-none border-b border-border bg-card px-5 h-10">
-          {['params', 'headers', 'body'].map(tab => (
+          {['params', 'headers', 'body', 'auth', 'pre-request', 'tests'].map(tab => (
             <TabsTrigger
               key={tab}
               value={tab}
@@ -277,6 +340,37 @@ export function RequestBuilder({ request, setRequest, setResponse, loading, setL
           </Button>
         </TabsContent>
 
+        <TabsContent value="auth" className="m-0">
+          <AuthTab
+            auth={request.auth}
+            authInherit={request.authInherit ?? 'none'}
+            canInherit={canInherit}
+            inheritedAuthLabel={inheritedAuthLabel}
+            onChangeAuth={(auth) => setRequest({ ...request, auth })}
+            onChangeAuthInherit={(authInherit) => setRequest({ ...request, authInherit })}
+          />
+        </TabsContent>
+
+        <TabsContent value="pre-request" className="p-5 m-0">
+          <Textarea
+            placeholder={`pm.environment.set("token", "abc123");\npm.globals.set("timestamp", Date.now().toString());\n// Generate dynamic values before the request fires`}
+            value={request.preRequestScript ?? ''}
+            onChange={(e) => setRequest({ ...request, preRequestScript: e.target.value })}
+            className="min-h-[120px] w-full bg-background border-border text-foreground placeholder:text-muted-foreground font-mono text-xs resize-none"
+          />
+          <p className="text-[10px] text-muted-foreground mt-2">Use pm.environment.set() and pm.globals.set() to set variables available as &#123;&#123;varName&#125;&#125; in the request.</p>
+        </TabsContent>
+
+        <TabsContent value="tests" className="p-5 m-0">
+          <Textarea
+            placeholder={`pm.test("Status is 200", () => pm.expect(pm.response.code).to.equal(200));\npm.test("Has JSON body", () => pm.expect(pm.response.json()).to.be.a("object"));`}
+            value={request.testScript ?? ''}
+            onChange={(e) => setRequest({ ...request, testScript: e.target.value })}
+            className="min-h-[120px] w-full bg-background border-border text-foreground placeholder:text-muted-foreground font-mono text-xs resize-none"
+          />
+          <p className="text-[10px] text-muted-foreground mt-2">Use pm.test() and pm.expect() for assertions. Results appear in the response Tests tab.</p>
+        </TabsContent>
+
         <TabsContent value="body" className="p-5 m-0 space-y-3">
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground shrink-0">Body type:</span>
@@ -323,12 +417,17 @@ export function RequestBuilder({ request, setRequest, setResponse, loading, setL
               </Button>
             </div>
           ) : request.bodyType && request.bodyType !== 'none' ? (
-            <Textarea
-              placeholder={request.bodyType === 'json' ? '{ "key": "value" }' : 'Enter request body...'}
-              value={request.body}
-              onChange={(e) => setRequest({ ...request, body: e.target.value })}
-              className="min-h-[140px] bg-background border-border text-foreground placeholder:text-muted-foreground font-mono text-xs resize-none"
-            />
+            <div className="space-y-0.5">
+              <Textarea
+                placeholder={request.bodyType === 'json' ? '{ "key": "value" } or use {{variableName}}' : 'Enter request body... or use {{variableName}}'}
+                value={request.body}
+                onChange={(e) => setRequest({ ...request, body: e.target.value })}
+                className="min-h-[140px] bg-background border-border text-foreground placeholder:text-muted-foreground font-mono text-xs resize-none"
+              />
+              {(activeEnvId || globalVars?.length) && request.body && /\{\{\w+\}\}/.test(request.body) && (
+                <span className="text-[10px] text-primary/80 font-mono">Variables will be resolved on Send</span>
+              )}
+            </div>
           ) : null}
         </TabsContent>
       </Tabs>

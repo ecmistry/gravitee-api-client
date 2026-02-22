@@ -4,6 +4,9 @@ import { GraviteeSidebar } from '@/components/gravitee/GraviteeSidebar';
 import { RequestBuilder } from '@/components/gravitee/RequestBuilder';
 import { RequestTabs } from '@/components/gravitee/RequestTabs';
 import { ResponseViewer } from '@/components/gravitee/ResponseViewer';
+import { EnvironmentSelector } from '@/components/gravitee/EnvironmentSelector';
+import { getEnvironments, setEnvironments, getActiveEnvironmentId, setActiveEnvironmentId, getGlobalVariables, setGlobalVariables } from '@/lib/variables';
+import { getAllRequestsFromCollections, findRequestLocation } from '@/lib/collections';
 import type { Collection, ApiRequest, ApiResponse } from '@/types/api';
 
 const Index = () => {
@@ -33,11 +36,34 @@ const Index = () => {
 
   const [tabs, setTabs] = useState<{ id: string; request: ApiRequest }[]>(() => [{ id: 'temp', request: { ...defaultRequest } }]);
   const [activeTabId, setActiveTabId] = useState('temp');
+  const [environments, setEnvsState] = useState(getEnvironments);
+  const [activeEnvId, setActiveEnvId] = useState<string | null>(getActiveEnvironmentId);
+  const [globalVars, setGlobalVarsState] = useState(getGlobalVariables);
+
+  useEffect(() => {
+    setEnvironments(environments);
+  }, [environments]);
+  useEffect(() => {
+    setActiveEnvironmentId(activeEnvId);
+  }, [activeEnvId]);
+  useEffect(() => {
+    setGlobalVariables(globalVars);
+  }, [globalVars]);
   const [responses, setResponses] = useState<Record<string, ApiResponse | null>>({});
+  const [testResults, setTestResults] = useState<Record<string, Array<{ name: string; passed: boolean; error?: string }>>>({});
   const [loading, setLoading] = useState(false);
 
   const activeRequest = tabs.find(t => t.id === activeTabId)?.request ?? defaultRequest;
   const response = responses[activeTabId] ?? null;
+
+  const reqLocation = findRequestLocation(collections, activeRequest.id);
+  const collection = reqLocation ? collections.find(c => c.id === reqLocation.collectionId) : undefined;
+  const folder = reqLocation?.folderId && collection
+    ? collection.folders.find(f => f.id === reqLocation.folderId)
+    : undefined;
+  const inheritedAuth = folder?.auth ?? collection?.auth;
+  const canInherit = !!(folder?.auth || collection?.auth);
+  const inheritedAuthLabel = folder?.auth ? 'Folder' : collection?.auth ? 'Collection' : undefined;
 
   const setActiveRequest = (req: ApiRequest) => {
     const existing = tabs.find(t => t.id === req.id);
@@ -58,6 +84,10 @@ const Index = () => {
     setResponses(prev => ({ ...prev, [activeTabId]: resp }));
   };
 
+  const setTestResultsForTab = (results: Array<{ name: string; passed: boolean; error?: string }>) => {
+    setTestResults(prev => ({ ...prev, [activeTabId]: results }));
+  };
+
   const closeTab = (id: string) => {
     const next = tabs.filter(t => t.id !== id);
     if (next.length === 0) return;
@@ -72,7 +102,7 @@ const Index = () => {
   const isDirty = (tab: { id: string; request: ApiRequest }) => {
     const req = tab.request;
     if (req.id.startsWith('temp')) return true;
-    const saved = collections.flatMap(c => c.requests).find(r => r.id === req.id);
+    const saved = getAllRequestsFromCollections(collections).find(r => r.id === req.id);
     return !saved || JSON.stringify(req) !== JSON.stringify(saved);
   };
 
@@ -87,20 +117,24 @@ const Index = () => {
         id: `req-${Date.now()}`,
         name: activeRequest.name || 'New Request'
       };
-      const collectionWithTemp = collections.find(col =>
-        col.requests.some(r => r.id === activeRequest.id)
-      );
+      const loc = findRequestLocation(collections, activeRequest.id);
       setCollections(collections.map(col => {
-        const hasTemp = col.requests.some(r => r.id === activeRequest.id);
-        if (hasTemp) {
+        if (loc?.collectionId !== col.id) return col;
+        const hasTempInRoot = col.requests.some(r => r.id === activeRequest.id);
+        if (hasTempInRoot) {
+          return { ...col, requests: col.requests.map(r => r.id === activeRequest.id ? newReq : r) };
+        }
+        if (loc.folderId) {
           return {
             ...col,
-            requests: col.requests.map(r =>
-              r.id === activeRequest.id ? newReq : r
+            folders: col.folders.map(f =>
+              f.id === loc.folderId
+                ? { ...f, requests: f.requests.map(r => r.id === activeRequest.id ? newReq : r) }
+                : f
             )
           };
         }
-        if (!collectionWithTemp && col === collections[0]) {
+        if (!loc && col === collections[0]) {
           return { ...col, requests: [...col.requests, newReq] };
         }
         return col;
@@ -112,18 +146,40 @@ const Index = () => {
         return { ...rest, [newReq.id]: prev[activeRequest.id] };
       });
     } else {
-      setCollections(collections.map(col => ({
-        ...col,
-        requests: col.requests.map(req =>
-          req.id === activeRequest.id ? activeRequest : req
-        )
-      })));
+      const loc = findRequestLocation(collections, activeRequest.id);
+      setCollections(collections.map(col => {
+        if (loc?.collectionId !== col.id) return col;
+        const inRoot = col.requests.some(r => r.id === activeRequest.id);
+        if (inRoot) {
+          return { ...col, requests: col.requests.map(r => r.id === activeRequest.id ? activeRequest : r) };
+        }
+        if (loc?.folderId) {
+          return {
+            ...col,
+            folders: col.folders.map(f =>
+              f.id === loc.folderId
+                ? { ...f, requests: f.requests.map(r => r.id === activeRequest.id ? activeRequest : r) }
+                : f
+            )
+          };
+        }
+        return col;
+      }));
     }
   };
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
-      <GraviteeTopBar collections={collections} setCollections={setCollections} />
+      <GraviteeTopBar
+        collections={collections}
+        setCollections={setCollections}
+        environments={environments}
+        activeEnvId={activeEnvId}
+        globalVars={globalVars}
+        onEnvironmentsChange={setEnvsState}
+        onActiveEnvChange={setActiveEnvId}
+        onGlobalVarsChange={setGlobalVarsState}
+      />
       <div className="flex-1 flex overflow-hidden">
         <GraviteeSidebar
           collections={collections}
@@ -144,11 +200,18 @@ const Index = () => {
             request={activeRequest}
             setRequest={setRequest}
             setResponse={setResponse}
+            setTestResults={setTestResultsForTab}
             loading={loading}
             setLoading={setLoading}
             onSaveRequest={handleSaveRequest}
+            activeEnvId={activeEnvId}
+            environments={environments}
+            globalVars={globalVars}
+            inheritedAuth={inheritedAuth}
+            canInherit={canInherit}
+            inheritedAuthLabel={inheritedAuthLabel}
           />
-          <ResponseViewer response={response} loading={loading} />
+          <ResponseViewer response={response} loading={loading} testResults={testResults[activeTabId] ?? []} />
         </div>
       </div>
     </div>

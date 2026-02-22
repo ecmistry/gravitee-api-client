@@ -1,11 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, Plus, ChevronDown, ChevronRight, Folder, Pencil, Trash2, History, X } from 'lucide-react';
+import { Search, Plus, ChevronDown, ChevronRight, Folder, FolderOpen, Pencil, Trash2, History, X, Copy, GripVertical, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getHistory, clearHistory } from '@/lib/history';
-import type { Collection, ApiRequest } from '@/types/api';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import type { Collection, ApiRequest, Folder } from '@/types/api';
+import type { AuthConfig } from '@/types/auth';
 import { METHOD_BG_COLORS } from '@/types/api';
+import { AuthTab } from './AuthTab';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 
 interface SidebarProps {
   collections: Collection[];
@@ -14,24 +20,55 @@ interface SidebarProps {
   setActiveRequest: (request: ApiRequest) => void;
 }
 
+function SortableCollectionItem({
+  id,
+  onContextMenu,
+  children,
+}: {
+  id: string;
+  onContextMenu: (e: React.MouseEvent) => void;
+  children: (props: { dragHandleProps: Record<string, unknown> }) => React.ReactNode;
+}) {
+  const { setNodeRef, transform, transition, listeners, attributes } = useSortable({ id });
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+  return (
+    <div ref={setNodeRef} style={style} className="mb-1" onContextMenu={onContextMenu}>
+      {children({ dragHandleProps: { ...listeners, ...attributes } })}
+    </div>
+  );
+}
+
 export function GraviteeSidebar({ collections, setCollections, activeRequest, setActiveRequest }: SidebarProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [editingCollectionId, setEditingCollectionId] = useState<string | null>(null);
+  const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
   const [editingRequestId, setEditingRequestId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [expandedCollections, setExpandedCollections] = useState<Set<string>>(
     new Set(collections.map(c => c.id))
   );
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [historyKey, setHistoryKey] = useState(0);
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const history = getHistory();
+  const [authSheetTarget, setAuthSheetTarget] = useState<{ type: 'collection'; collection: Collection } | { type: 'folder'; folder: Folder; collectionId: string } | null>(null);
   const [contextMenu, setContextMenu] = useState<{
+    type: 'request';
     request: ApiRequest;
     collectionId: string;
+    folderId?: string;
     x: number;
     y: number;
-  } | null>(null);
+  } | { type: 'collection'; collection: Collection; x: number; y: number } | { type: 'folder'; folder: Folder; collectionId: string; x: number; y: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor)
+  );
 
   useEffect(() => {
     if (!contextMenu) return;
@@ -57,24 +94,92 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
     setExpandedCollections(next);
   };
 
-  const addNewRequest = (collectionId: string) => {
-    const newReq: ApiRequest = {
-      id: `temp-${Date.now()}`,
-      name: 'New Request',
-      method: 'GET',
-      url: '',
-      params: [],
-      headers: [],
-      body: '',
-      bodyType: 'none',
-      formData: []
+  const toggleFolder = (id: string) => {
+    const next = new Set(expandedFolders);
+    next.has(id) ? next.delete(id) : next.add(id);
+    setExpandedFolders(next);
+  };
+
+  const newRequest = (): ApiRequest => ({
+    id: `temp-${Date.now()}`,
+    name: 'New Request',
+    method: 'GET',
+    url: '',
+    params: [],
+    headers: [],
+    body: '',
+    bodyType: 'none',
+    formData: []
+  });
+
+  const addNewRequest = (collectionId: string, folderId?: string) => {
+    const newReq = newRequest();
+    setCollections(collections.map(col => {
+      if (col.id !== collectionId) return col;
+      if (folderId) {
+        return {
+          ...col,
+          folders: col.folders.map(f =>
+            f.id === folderId ? { ...f, requests: [...f.requests, newReq] } : f
+          )
+        };
+      }
+      return { ...col, requests: [...col.requests, newReq] };
+    }));
+    setActiveRequest(newReq);
+  };
+
+  const addNewFolder = (collectionId: string) => {
+    const folder: Folder = {
+      id: `folder-${Date.now()}`,
+      name: 'New Folder',
+      requests: []
     };
     setCollections(collections.map(col =>
-      col.id === collectionId
-        ? { ...col, requests: [...col.requests, newReq] }
-        : col
+      col.id === collectionId ? { ...col, folders: [...col.folders, folder] } : col
     ));
-    setActiveRequest(newReq);
+    setExpandedCollections(prev => new Set([...prev, folder.id]));
+  };
+
+  const deleteCollection = (collectionId: string) => {
+    const col = collections.find(c => c.id === collectionId);
+    if (!col) return;
+    const hasActive = col.requests.some(r => r.id === activeRequest.id) ||
+      col.folders.some(f => f.requests.some(r => r.id === activeRequest.id));
+    if (hasActive) {
+      const remaining = collections.flatMap(c => c.id === collectionId ? [] : [...c.requests, ...c.folders.flatMap(f => f.requests)]);
+      setActiveRequest(remaining[0] ?? newRequest());
+    }
+    setCollections(collections.filter(c => c.id !== collectionId));
+  };
+
+  const duplicateRequest = (request: ApiRequest, collectionId: string, folderId?: string) => {
+    const dup: ApiRequest = { ...request, id: `temp-${Date.now()}`, name: `${request.name} (copy)` };
+    setCollections(collections.map(col => {
+      if (col.id !== collectionId) return col;
+      if (folderId) {
+        return {
+          ...col,
+          folders: col.folders.map(f =>
+            f.id === folderId ? { ...f, requests: [...f.requests, dup] } : f
+          )
+        };
+      }
+      return { ...col, requests: [...col.requests, dup] };
+    }));
+    setActiveRequest(dup);
+  };
+
+  const duplicateFolder = (folder: Folder, collectionId: string) => {
+    const dup: Folder = {
+      id: `folder-${Date.now()}`,
+      name: `${folder.name} (copy)`,
+      requests: folder.requests.map(r => ({ ...r, id: `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`, name: `${r.name} (copy)` }))
+    };
+    setCollections(collections.map(col =>
+      col.id === collectionId ? { ...col, folders: [...col.folders, dup] } : col
+    ));
+    setExpandedCollections(prev => new Set([...prev, dup.id]));
   };
 
   const addNewCollection = () => {
@@ -89,6 +194,7 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
   };
 
   const startRenameCollection = (collection: Collection) => {
+    setEditingFolderId(null);
     setEditingRequestId(null);
     setEditingCollectionId(collection.id);
     setEditingName(collection.name);
@@ -111,8 +217,49 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
     setEditingName('');
   };
 
+  const startRenameFolder = (folder: Folder) => {
+    setEditingCollectionId(null);
+    setEditingRequestId(null);
+    setEditingFolderId(folder.id);
+    setEditingName(folder.name);
+  };
+
+  const saveRenameFolder = () => {
+    if (!editingFolderId || !editingName.trim()) {
+      setEditingFolderId(null);
+      return;
+    }
+    setCollections(collections.map(col => ({
+      ...col,
+      folders: col.folders.map(f => f.id === editingFolderId ? { ...f, name: editingName.trim() } : f)
+    })));
+    setEditingFolderId(null);
+    setEditingName('');
+  };
+
+  const deleteFolder = (folderId: string, collectionId: string) => {
+    setCollections(collections.map(col =>
+      col.id === collectionId ? { ...col, folders: col.folders.filter(f => f.id !== folderId) } : col
+    ));
+  };
+
+  const setCollectionAuth = (collectionId: string, auth: AuthConfig | undefined) => {
+    setCollections(collections.map(col =>
+      col.id === collectionId ? { ...col, auth } : col
+    ));
+  };
+
+  const setFolderAuth = (collectionId: string, folderId: string, auth: AuthConfig | undefined) => {
+    setCollections(collections.map(col =>
+      col.id === collectionId
+        ? { ...col, folders: col.folders.map(f => f.id === folderId ? { ...f, auth } : f) }
+        : col
+    ));
+  };
+
   const startRenameRequest = (request: ApiRequest) => {
     setEditingCollectionId(null);
+    setEditingFolderId(null);
     setEditingRequestId(request.id);
     setEditingName(request.name);
   };
@@ -126,7 +273,13 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
       ...col,
       requests: col.requests.map(req =>
         req.id === editingRequestId ? { ...req, name: editingName.trim() } : req
-      )
+      ),
+      folders: col.folders.map(f => ({
+        ...f,
+        requests: f.requests.map(req =>
+          req.id === editingRequestId ? { ...req, name: editingName.trim() } : req
+        )
+      }))
     })));
     setActiveRequest(prev =>
       prev.id === editingRequestId ? { ...prev, name: editingName.trim() } : prev
@@ -140,15 +293,22 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
     setEditingName('');
   };
 
-  const deleteRequest = (request: ApiRequest, collectionId: string) => {
-    const updatedCollections = collections.map(col =>
-      col.id === collectionId
-        ? { ...col, requests: col.requests.filter(r => r.id !== request.id) }
-        : col
-    );
+  const deleteRequest = (request: ApiRequest, collectionId: string, folderId?: string) => {
+    const updatedCollections = collections.map(col => {
+      if (col.id !== collectionId) return col;
+      if (folderId) {
+        return {
+          ...col,
+          folders: col.folders.map(f =>
+            f.id === folderId ? { ...f, requests: f.requests.filter(r => r.id !== request.id) } : f
+          )
+        };
+      }
+      return { ...col, requests: col.requests.filter(r => r.id !== request.id) };
+    });
     setCollections(updatedCollections);
     if (activeRequest.id === request.id) {
-      const remaining = updatedCollections.flatMap(c => c.requests);
+      const remaining = updatedCollections.flatMap(c => [...c.requests, ...c.folders.flatMap(f => f.requests)]);
       setActiveRequest(remaining[0] ?? {
         id: 'temp',
         name: 'Untitled Request',
@@ -163,13 +323,19 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
     }
   };
 
-  const filteredCollections = collections.map(col => ({
-    ...col,
-    requests: col.requests.filter(r =>
-      !searchQuery || r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      r.url.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-  })).filter(col => !searchQuery || col.requests.length > 0);
+  const matchRequest = (r: ApiRequest) =>
+    !searchQuery || r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (r.url && r.url.toLowerCase().includes(searchQuery.toLowerCase()));
+
+  const filteredCollections = collections.map(col => {
+    const filteredRoot = col.requests.filter(matchRequest);
+    const filteredFolders = col.folders.map(f => ({
+      ...f,
+      requests: f.requests.filter(matchRequest)
+    })).filter(f => !searchQuery || f.requests.length > 0);
+    const hasMatches = !searchQuery || filteredRoot.length > 0 || filteredFolders.length > 0;
+    return { ...col, requests: filteredRoot, folders: searchQuery ? filteredFolders : col.folders, hasMatches };
+  }).filter(col => col.hasMatches);
 
   return (
     <div className="w-64 bg-sidebar border-r border-border flex flex-col h-full shrink-0">
@@ -188,13 +354,41 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
 
       {/* Collections */}
       <div className="flex-1 overflow-y-auto p-2">
-        {filteredCollections.map((collection) => (
-          <div key={collection.id} className="mb-1">
-            <div className="flex items-center justify-between group">
-              <button
-                onClick={() => toggleCollection(collection.id)}
-                className="flex items-center gap-1.5 flex-1 px-2 py-1.5 rounded-md hover:bg-secondary/50 transition-colors text-left min-w-0"
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={(e) => {
+            if (e.over && e.active.id !== e.over.id) {
+              const oldIdx = collections.findIndex(c => c.id === e.active.id);
+              const newIdx = collections.findIndex(c => c.id === e.over!.id);
+              if (oldIdx >= 0 && newIdx >= 0) setCollections(arrayMove(collections, oldIdx, newIdx));
+            }
+          }}
+        >
+          <SortableContext items={filteredCollections.map(c => c.id)} strategy={verticalListSortingStrategy}>
+            {filteredCollections.map((collection) => (
+              <SortableCollectionItem
+                key={collection.id}
+                id={collection.id}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setContextMenu({ type: 'collection', collection, x: e.clientX, y: e.clientY });
+                }}
               >
+                {({ dragHandleProps }) => (
+                  <>
+                <div className="flex items-center justify-between group">
+                  <div
+                    className="cursor-grab active:cursor-grabbing p-0.5 rounded hover:bg-secondary/50 touch-none shrink-0"
+                    title="Drag to reorder"
+                    {...dragHandleProps}
+                  >
+                    <GripVertical className="w-3 h-3 text-muted-foreground" />
+                  </div>
+                  <button
+                    onClick={() => toggleCollection(collection.id)}
+                    className="flex items-center gap-1.5 flex-1 px-2 py-1.5 rounded-md hover:bg-secondary/50 transition-colors text-left min-w-0"
+                  >
                 {expandedCollections.has(collection.id)
                   ? <ChevronDown className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
                   : <ChevronRight className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
@@ -257,6 +451,49 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
                   transition={{ duration: 0.15 }}
                   className="overflow-hidden ml-5 mt-0.5 space-y-0.5"
                 >
+                  {collection.folders.map((folder) => (
+                    <div key={folder.id} className="mb-0.5" onContextMenu={(e) => { e.preventDefault(); setContextMenu({ type: 'folder', folder, collectionId: collection.id, x: e.clientX, y: e.clientY }); }}>
+                      <div className="flex items-center justify-between group/folder">
+                        <button
+                          onClick={() => toggleFolder(folder.id)}
+                          className="flex items-center gap-1.5 flex-1 px-2 py-1 rounded-md hover:bg-secondary/50 transition-colors text-left min-w-0"
+                        >
+                          {expandedFolders.has(folder.id) ? <ChevronDown className="w-3 h-3 text-muted-foreground" /> : <ChevronRight className="w-3 h-3 text-muted-foreground" />}
+                          <FolderOpen className="w-3 h-3 shrink-0 text-primary/60" />
+                          {editingFolderId === folder.id ? (
+                            <Input value={editingName} onChange={(e) => setEditingName(e.target.value)} onBlur={saveRenameFolder} onKeyDown={(e) => { if (e.key === 'Enter') saveRenameFolder(); if (e.key === 'Escape') setEditingFolderId(null); }} onClick={(e) => e.stopPropagation()} className="h-5 text-xs px-1 flex-1 min-w-0" autoFocus />
+                          ) : (
+                            <span className="text-[11px] text-sidebar-foreground truncate flex-1" onDoubleClick={(e) => { e.stopPropagation(); startRenameFolder(folder); }}>{folder.name}</span>
+                          )}
+                        </button>
+                        {editingFolderId !== folder.id && (
+                          <>
+                            <Button variant="ghost" size="icon" className="w-5 h-5 opacity-0 group-hover/folder:opacity-100" onClick={(e) => { e.stopPropagation(); addNewRequest(collection.id, folder.id); }}>
+                              <Plus className="w-3 h-3" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="w-5 h-5 opacity-0 group-hover/folder:opacity-100" onClick={(e) => { e.stopPropagation(); duplicateFolder(folder, collection.id); }}>
+                              <Copy className="w-3 h-3" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                      <AnimatePresence>
+                        {expandedFolders.has(folder.id) && (
+                          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden ml-4 mt-0.5 space-y-0.5">
+                            {folder.requests.map((request) => (
+                              <div key={request.id} className={`flex items-center gap-2 group/req ${activeRequest.id === request.id ? 'bg-primary/10 border-l-2 border-primary' : 'border-l-2 border-transparent'}`} onContextMenu={(e) => { e.preventDefault(); setContextMenu({ type: 'request', request, collectionId: collection.id, folderId: folder.id, x: e.clientX, y: e.clientY }); }}>
+                                <button onClick={() => setActiveRequest(request)} className={`flex-1 flex items-center gap-2 px-2 py-1.5 rounded-md text-left text-xs min-w-0 ${activeRequest.id === request.id ? '' : 'hover:bg-secondary/50'}`}>
+                                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${METHOD_BG_COLORS[request.method] || ''}`}>{request.method}</span>
+                                  {editingRequestId === request.id ? <Input value={editingName} onChange={(e) => setEditingName(e.target.value)} onBlur={saveRenameRequest} onKeyDown={(e) => { if (e.key === 'Enter') saveRenameRequest(); if (e.key === 'Escape') cancelRenameRequest(); }} onClick={(e) => e.stopPropagation()} className="h-6 text-xs px-1.5 py-0 flex-1 min-w-0" autoFocus /> : <span className="text-sidebar-foreground truncate flex-1 block" onDoubleClick={(e) => { e.stopPropagation(); startRenameRequest(request); }}>{request.name}</span>}
+                                </button>
+                                {editingRequestId !== request.id && <Button variant="ghost" size="icon" className="w-6 h-6 shrink-0 opacity-0 group-hover/req:opacity-100" onClick={(e) => { e.stopPropagation(); startRenameRequest(request); }}><Pencil className="w-3.5 h-3.5" /></Button>}
+                              </div>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  ))}
                   {collection.requests.map((request) => (
                     <div
                       key={request.id}
@@ -268,6 +505,7 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
                       onContextMenu={(e) => {
                         e.preventDefault();
                         setContextMenu({
+                          type: 'request',
                           request,
                           collectionId: collection.id,
                           x: e.clientX,
@@ -325,11 +563,20 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
                       )}
                     </div>
                   ))}
+                  <div className="flex gap-1 mt-1">
+                    <button onClick={() => addNewFolder(collection.id)} className="text-[10px] text-muted-foreground hover:text-foreground px-2 py-0.5">+ Add folder</button>
+                    <span className="text-muted-foreground">·</span>
+                    <button onClick={() => addNewRequest(collection.id)} className="text-[10px] text-muted-foreground hover:text-foreground px-2 py-0.5">+ Add request</button>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
-          </div>
-        ))}
+                  </>
+                )}
+              </SortableCollectionItem>
+            ))}
+          </SortableContext>
+        </DndContext>
       </div>
 
       {/* History */}
@@ -399,35 +646,81 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
         </Button>
       </div>
 
-      {/* Context menu for requests */}
+      {/* Context menus */}
       {contextMenu && (
         <div
           ref={menuRef}
-          className="fixed z-50 min-w-[140px] rounded-md border border-border bg-popover p-1 shadow-md"
+          className="fixed z-50 min-w-[160px] rounded-md border border-border bg-popover p-1 shadow-md"
           style={{ left: contextMenu.x, top: contextMenu.y }}
         >
-          <button
-            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs outline-none hover:bg-accent hover:text-accent-foreground"
-            onClick={() => {
-              startRenameRequest(contextMenu.request);
-              setContextMenu(null);
-            }}
-          >
-            <Pencil className="w-3.5 h-3.5" />
-            Rename
-          </button>
-          <button
-            className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-destructive outline-none hover:bg-destructive/10"
-            onClick={() => {
-              deleteRequest(contextMenu.request, contextMenu.collectionId);
-              setContextMenu(null);
-            }}
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            Delete
-          </button>
+          {contextMenu.type === 'request' && (
+            <>
+              <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs outline-none hover:bg-accent hover:text-accent-foreground" onClick={() => { startRenameRequest(contextMenu.request); setContextMenu(null); }}>
+                <Pencil className="w-3.5 h-3.5" /> Rename
+              </button>
+              <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs outline-none hover:bg-accent hover:text-accent-foreground" onClick={() => { duplicateRequest(contextMenu.request, contextMenu.collectionId, contextMenu.folderId); setContextMenu(null); }}>
+                <Copy className="w-3.5 h-3.5" /> Duplicate
+              </button>
+              <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-destructive outline-none hover:bg-destructive/10" onClick={() => { deleteRequest(contextMenu.request, contextMenu.collectionId, contextMenu.folderId); setContextMenu(null); }}>
+                <Trash2 className="w-3.5 h-3.5" /> Delete
+              </button>
+            </>
+          )}
+          {contextMenu.type === 'collection' && (
+            <>
+              <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs outline-none hover:bg-accent hover:text-accent-foreground" onClick={() => { setAuthSheetTarget({ type: 'collection', collection: contextMenu.collection }); setContextMenu(null); }}>
+                <Shield className="w-3.5 h-3.5" /> Set auth
+              </button>
+              <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-destructive outline-none hover:bg-destructive/10" onClick={() => { deleteCollection(contextMenu.collection.id); setContextMenu(null); }}>
+                <Trash2 className="w-3.5 h-3.5" /> Delete collection
+              </button>
+            </>
+          )}
+          {contextMenu.type === 'folder' && (
+            <>
+              <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs outline-none hover:bg-accent hover:text-accent-foreground" onClick={() => { setAuthSheetTarget({ type: 'folder', folder: contextMenu.folder, collectionId: contextMenu.collectionId }); setContextMenu(null); }}>
+                <Shield className="w-3.5 h-3.5" /> Set auth
+              </button>
+              <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs outline-none hover:bg-accent hover:text-accent-foreground" onClick={() => { startRenameFolder(contextMenu.folder); setContextMenu(null); }}>
+                <Pencil className="w-3.5 h-3.5" /> Rename
+              </button>
+              <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs outline-none hover:bg-accent hover:text-accent-foreground" onClick={() => { duplicateFolder(contextMenu.folder, contextMenu.collectionId); setContextMenu(null); }}>
+                <Copy className="w-3.5 h-3.5" /> Duplicate
+              </button>
+              <button className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-xs text-destructive outline-none hover:bg-destructive/10" onClick={() => { deleteFolder(contextMenu.folder.id, contextMenu.collectionId); setContextMenu(null); }}>
+                <Trash2 className="w-3.5 h-3.5" /> Delete folder
+              </button>
+            </>
+          )}
         </div>
       )}
+
+      {/* Auth config sheet for collection/folder */}
+      <Sheet open={!!authSheetTarget} onOpenChange={(open) => !open && setAuthSheetTarget(null)}>
+        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>{authSheetTarget?.type === 'collection' ? `Auth: ${authSheetTarget.collection.name}` : authSheetTarget ? `Auth: ${authSheetTarget.folder.name}` : 'Auth'}</SheetTitle>
+          </SheetHeader>
+          {authSheetTarget && (
+            <div className="mt-4">
+              <AuthTab
+                auth={authSheetTarget.type === 'collection' ? authSheetTarget.collection.auth : authSheetTarget.folder.auth}
+                authInherit="none"
+                canInherit={false}
+                onChangeAuth={(auth) => {
+                  if (authSheetTarget.type === 'collection') {
+                    setCollectionAuth(authSheetTarget.collection.id, auth.type === 'no-auth' ? undefined : auth);
+                  } else {
+                    setFolderAuth(authSheetTarget.collectionId, authSheetTarget.folder.id, auth.type === 'no-auth' ? undefined : auth);
+                  }
+                }}
+                onChangeAuthInherit={() => {}}
+              />
+              <p className="text-[10px] text-muted-foreground mt-4">Requests in this {authSheetTarget.type} can inherit this auth via Auth tab → Inherit from Parent</p>
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

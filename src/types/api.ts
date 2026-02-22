@@ -1,23 +1,33 @@
+import type { AuthConfig } from './auth';
+
 export interface Collection {
   id: string;
   name: string;
   folders: Folder[];
   requests: ApiRequest[];
+  /** Auth inherited by requests that choose "Inherit from Parent" */
+  auth?: AuthConfig;
 }
 
 export interface Folder {
   id: string;
   name: string;
   requests: ApiRequest[];
+  /** Auth inherited by requests (overrides collection auth when set) */
+  auth?: AuthConfig;
 }
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS';
 
 export type BodyType = 'none' | 'json' | 'xml' | 'text' | 'html' | 'form-data' | 'form-urlencoded';
 
+/** Auth inheritance: use own auth, or inherit from folder/collection */
+export type AuthInheritance = 'inherit' | 'none'; // inherit = use parent, none = use request's own auth
+
 export interface ApiRequest {
   id: string;
   name: string;
+  description?: string;
   method: HttpMethod;
   url: string;
   params: KeyValuePair[];
@@ -26,6 +36,14 @@ export interface ApiRequest {
   bodyType: BodyType;
   /** Key-value pairs for form-urlencoded or form-data */
   formData?: KeyValuePair[];
+  /** Auth config for this request (used when authInherit !== 'inherit') */
+  auth?: AuthConfig;
+  /** 'inherit' = use folder auth or collection auth; 'none' = use request.auth */
+  authInherit?: AuthInheritance;
+  /** JavaScript run before request (pm.environment.set, pm.globals.set) */
+  preRequestScript?: string;
+  /** JavaScript run after response (pm.test, pm.expect, pm.response) */
+  testScript?: string;
 }
 
 export interface KeyValuePair {

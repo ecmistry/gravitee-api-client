@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { ResponseViewer } from './ResponseViewer';
 import type { ApiResponse } from '@/types/api';
 
@@ -56,5 +57,54 @@ describe('ResponseViewer', () => {
     render(<ResponseViewer response={response} loading={false} />);
     expect(screen.getByText(/"key":/)).toBeInTheDocument();
     expect(screen.getByText(/"value"/)).toBeInTheDocument();
+  });
+
+  it('shows Tests tab when response present', () => {
+    const response: ApiResponse = {
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      data: {},
+      time: 0,
+      size: 0
+    };
+    render(<ResponseViewer response={response} loading={false} />);
+    expect(screen.getByRole('tab', { name: /tests/i })).toBeInTheDocument();
+  });
+
+  it('shows empty state in Tests tab when no results', async () => {
+    const user = userEvent.setup();
+    const response: ApiResponse = {
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      data: {},
+      time: 0,
+      size: 0
+    };
+    render(<ResponseViewer response={response} loading={false} testResults={[]} />);
+    await user.click(screen.getByRole('tab', { name: /tests/i }));
+    expect(screen.getByText(/Add test scripts in the Tests tab/)).toBeInTheDocument();
+  });
+
+  it('shows pass/fail for test results', async () => {
+    const user = userEvent.setup();
+    const response: ApiResponse = {
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      data: {},
+      time: 0,
+      size: 0
+    };
+    const testResults = [
+      { name: 'Status is 200', passed: true },
+      { name: 'Has body', passed: false, error: 'Expected 200 to equal 404' },
+    ];
+    render(<ResponseViewer response={response} loading={false} testResults={testResults} />);
+    await user.click(screen.getByRole('tab', { name: /tests/i }));
+    expect(screen.getByText('Status is 200')).toBeInTheDocument();
+    expect(screen.getByText('Has body')).toBeInTheDocument();
+    expect(screen.getByText(/Expected 200 to equal 404/)).toBeInTheDocument();
   });
 });
