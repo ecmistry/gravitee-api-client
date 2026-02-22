@@ -17,16 +17,26 @@ function corsProxyPlugin(): Plugin {
         req.on("data", (chunk) => { body += chunk.toString(); });
         req.on("end", async () => {
           try {
-            const { url, method = "GET", headers = {}, body: requestBody } = JSON.parse(body);
+            const { url, method = "GET", headers = {}, body: requestBody, formData } = JSON.parse(body);
             if (!url || typeof url !== "string") {
               res.writeHead(400, { "Content-Type": "application/json" });
               res.end(JSON.stringify({ error: "Missing url" }));
               return;
             }
+            let fetchBody: string | undefined;
+            const fetchHeaders = { ...(headers as Record<string, string>) };
+            if (Array.isArray(formData) && formData.length > 0) {
+              const params = new URLSearchParams();
+              formData.forEach((p: { key: string; value: string }) => params.append(p.key, p.value));
+              fetchBody = params.toString();
+              fetchHeaders["Content-Type"] = "application/x-www-form-urlencoded";
+            } else if (requestBody !== undefined && requestBody !== null) {
+              fetchBody = String(requestBody);
+            }
             const proxyRes = await fetch(url, {
               method: method as string,
-              headers: headers as Record<string, string>,
-              body: requestBody ? String(requestBody) : undefined,
+              headers: fetchHeaders,
+              body: fetchBody,
             });
             const respBody = await proxyRes.text();
             res.writeHead(proxyRes.status, proxyRes.statusText, {

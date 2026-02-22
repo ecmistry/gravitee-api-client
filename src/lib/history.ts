@@ -23,3 +23,7 @@ export function getHistory(): HistoryEntry[] {
     return [];
   }
 }
+
+export function clearHistory(): void {
+  localStorage.removeItem(HISTORY_KEY);
+}

@@ -1,6 +1,9 @@
-import { Clock, Database, CheckCircle2, XCircle, AlertCircle, Send, Loader2 } from 'lucide-react';
+import { useState } from 'react';
+import { Clock, Database, CheckCircle2, XCircle, AlertCircle, Send, Loader2, Copy, Check } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
+import { toast } from 'sonner';
 import type { ApiResponse } from '@/types/api';
 
 interface ResponseViewerProps {
@@ -8,7 +11,30 @@ interface ResponseViewerProps {
   loading: boolean;
 }
 
+function formatResponseBody(data: unknown, pretty: boolean): string {
+  if (typeof data === 'string') return data;
+  try {
+    return pretty ? JSON.stringify(data, null, 2) : JSON.stringify(data);
+  } catch {
+    return String(data);
+  }
+}
+
 export function ResponseViewer({ response, loading }: ResponseViewerProps) {
+  const [bodyView, setBodyView] = useState<'pretty' | 'raw' | 'preview'>('pretty');
+  const [copied, setCopied] = useState(false);
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      toast.success('Copied to clipboard');
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error('Failed to copy');
+    }
+  };
+
   const getStatusStyle = (status: number) => {
     if (status >= 200 && status < 300) return 'text-status-success bg-status-success/10 border-status-success/30';
     if (status >= 300 && status < 400) return 'text-status-redirect bg-status-redirect/10 border-status-redirect/30';
@@ -94,13 +120,46 @@ export function ResponseViewer({ response, loading }: ResponseViewerProps) {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="body" className="flex-1 p-4 overflow-auto m-0">
+        <TabsContent value="body" className="flex-1 flex flex-col overflow-hidden m-0">
+          <div className="flex items-center justify-end gap-2 px-4 py-2 border-b border-border shrink-0">
+            <div className="flex rounded-md border border-border overflow-hidden">
+              {(['pretty', 'raw', 'preview'] as const).map(mode => (
+                <button
+                  key={mode}
+                  onClick={() => setBodyView(mode)}
+                  className={`px-3 py-1.5 text-xs capitalize ${bodyView === mode ? 'bg-primary text-primary-foreground' : 'bg-card text-muted-foreground hover:text-foreground'}`}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => copyToClipboard(typeof response.data === 'string' ? response.data : formatResponseBody(response.data, bodyView === 'pretty'))}
+            >
+              {copied ? <Check className="w-3.5 h-3.5 mr-1" /> : <Copy className="w-3.5 h-3.5 mr-1" />}
+              Copy
+            </Button>
+          </div>
+          <div className="flex-1 p-4 overflow-auto">
           <div className="bg-card rounded-lg border border-border p-4">
-            <pre className="text-xs font-mono text-foreground whitespace-pre-wrap break-words leading-relaxed">
-              {typeof response.data === 'string'
-                ? response.data
-                : JSON.stringify(response.data, null, 2)}
-            </pre>
+            {bodyView === 'preview' && typeof response.data === 'string' && response.data.trimStart().startsWith('<') ? (
+              <iframe
+                srcDoc={response.data}
+                title="Preview"
+                className="w-full min-h-[200px] rounded border-0"
+                sandbox="allow-same-origin"
+              />
+            ) : bodyView === 'preview' ? (
+              <p className="text-xs text-muted-foreground">Preview is only available for HTML responses.</p>
+            ) : (
+              <pre className="text-xs font-mono text-foreground whitespace-pre-wrap break-words leading-relaxed">
+                {formatResponseBody(response.data, bodyView === 'pretty')}
+              </pre>
+            )}
+          </div>
           </div>
         </TabsContent>
 

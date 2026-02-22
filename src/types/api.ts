@@ -13,6 +13,8 @@ export interface Folder {
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS';
 
+export type BodyType = 'none' | 'json' | 'xml' | 'text' | 'html' | 'form-data' | 'form-urlencoded';
+
 export interface ApiRequest {
   id: string;
   name: string;
@@ -21,7 +23,9 @@ export interface ApiRequest {
   params: KeyValuePair[];
   headers: KeyValuePair[];
   body: string;
-  bodyType: 'none' | 'json' | 'form' | 'raw';
+  bodyType: BodyType;
+  /** Key-value pairs for form-urlencoded or form-data */
+  formData?: KeyValuePair[];
 }
 
 export interface KeyValuePair {

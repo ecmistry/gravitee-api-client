@@ -26,7 +26,8 @@ export function importFromPostman(data: any): Collection[] {
         key: h.key, value: h.value, enabled: !h.disabled
       })),
       body: item.request?.body?.raw || '',
-      bodyType: item.request?.body?.mode === 'raw' ? 'raw' : 'none',
+      bodyType: item.request?.body?.mode === 'raw' ? 'json' : 'none',
+      formData: [],
     })),
   };
   return [collection];
@@ -46,6 +47,7 @@ export function importFromInsomnia(data: any): Collection[] {
       })),
       body: r.body?.text || '',
       bodyType: r.body?.mimeType?.includes('json') ? 'json' : 'none',
+      formData: [],
     }));
 
   return [{

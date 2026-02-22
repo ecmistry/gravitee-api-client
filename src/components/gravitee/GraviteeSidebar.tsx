@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, Plus, ChevronDown, ChevronRight, Folder, Pencil, Trash2 } from 'lucide-react';
+import { Search, Plus, ChevronDown, ChevronRight, Folder, Pencil, Trash2, History, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getHistory, clearHistory } from '@/lib/history';
 import type { Collection, ApiRequest } from '@/types/api';
 import { METHOD_BG_COLORS } from '@/types/api';
 
@@ -21,6 +22,9 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
   const [expandedCollections, setExpandedCollections] = useState<Set<string>>(
     new Set(collections.map(c => c.id))
   );
+  const [historyKey, setHistoryKey] = useState(0);
+  const [historyExpanded, setHistoryExpanded] = useState(false);
+  const history = getHistory();
   const [contextMenu, setContextMenu] = useState<{
     request: ApiRequest;
     collectionId: string;
@@ -62,7 +66,8 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
       params: [],
       headers: [],
       body: '',
-      bodyType: 'none'
+      bodyType: 'none',
+      formData: []
     };
     setCollections(collections.map(col =>
       col.id === collectionId
@@ -153,6 +158,7 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
         headers: [],
         body: '',
         bodyType: 'none' as const,
+        formData: [],
       });
     }
   };
@@ -324,6 +330,60 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
             </AnimatePresence>
           </div>
         ))}
+      </div>
+
+      {/* History */}
+      <div className="border-t border-border">
+        <button
+          onClick={() => setHistoryExpanded(!historyExpanded)}
+          className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-secondary/50 transition-colors"
+        >
+          <span className="text-xs font-medium text-sidebar-foreground flex items-center gap-2">
+            <History className="w-3.5 h-3.5 text-muted-foreground" />
+            History ({history.length})
+          </span>
+          {historyExpanded ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />}
+        </button>
+        <AnimatePresence>
+          {historyExpanded && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="max-h-40 overflow-y-auto px-2 pb-2 space-y-0.5" key={historyKey}>
+                {history.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-2">No requests yet</p>
+                ) : (
+                  <>
+                    {history.map((entry, i) => (
+                      <button
+                        key={`${entry.timestamp}-${i}`}
+                        onClick={() => setActiveRequest(entry.request)}
+                        className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-left hover:bg-secondary/50 transition-colors group"
+                      >
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${METHOD_BG_COLORS[entry.request.method] || ''}`}>
+                          {entry.request.method}
+                        </span>
+                        <span className="text-xs text-sidebar-foreground truncate flex-1">{entry.request.url}</span>
+                      </button>
+                    ))}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { clearHistory(); setHistoryKey(k => k + 1); }}
+                      className="w-full justify-start text-muted-foreground hover:text-destructive h-7 text-xs mt-1"
+                    >
+                      <X className="w-3.5 h-3.5 mr-1" />
+                      Clear history
+                    </Button>
+                  </>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* New Collection */}
