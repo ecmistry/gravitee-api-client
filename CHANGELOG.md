@@ -444,3 +444,38 @@
 - **monitorScheduler.test.ts**: isMonitorDue, getNextRunTime, createScheduler (start/stop)
 - **monitorAlerts.test.ts**: runMonitorAlert (webhook enabled/disabled, URL validation)
 - **Phase11.integration.test.tsx**: Monitoring button in top bar, opens sheet with Monitors and Results tabs
+
+---
+
+## Phase 12 — OpenAPI / Swagger Import & Export
+
+### Import
+
+| Feature | Status |
+|--------|--------|
+| Import OpenAPI 3.0 YAML/JSON → collection with endpoints, params, example bodies | Done |
+| Import Swagger 2.0 YAML/JSON → collection | Done |
+| Import Postman Collection v2.1 (folders supported) | Done |
+| Validate OpenAPI specs with linting and error reporting on import | Done |
+
+### Export
+
+| Feature | Status |
+|--------|--------|
+| Export to OpenAPI 3.0 JSON | Done |
+| Export to OpenAPI 3.0 YAML | Done |
+| Export to Postman v2.1 format | Done |
+| Export dropdown in top bar | Done |
+
+### Implementation Notes
+
+- Import accepts .json, .yaml, .yml
+- YAML parsed via `yaml` package
+- OpenAPI/Swagger validation blocks import on critical errors
+
+### Tests (Phase 12)
+
+- **openApiImport.test.ts**: isOpenAPI3, isSwagger2, importFromOpenAPI3, importFromSwagger2
+- **openApiValidation.test.ts**: validateOpenAPI, hasValidationErrors
+- **importExport.test.ts**: detectFormat openapi/swagger, exportToOpenAPI, exportToPostman
+- **Phase12.integration.test.tsx**: Import/Export buttons, Export dropdown format options
