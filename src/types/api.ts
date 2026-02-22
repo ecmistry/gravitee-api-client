@@ -21,8 +21,8 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 
 
 export type BodyType = 'none' | 'json' | 'xml' | 'text' | 'html' | 'form-data' | 'form-urlencoded';
 
-/** Request type: HTTP, WebSocket, SSE, or Socket.IO */
-export type RequestType = 'http' | 'websocket' | 'sse' | 'socketio';
+/** Request type: HTTP, WebSocket, SSE, Socket.IO, or GraphQL */
+export type RequestType = 'http' | 'websocket' | 'sse' | 'socketio' | 'graphql';
 
 /** Auth inheritance: use own auth, or inherit from folder/collection */
 export type AuthInheritance = 'inherit' | 'none'; // inherit = use parent, none = use request's own auth
@@ -49,6 +49,10 @@ export interface ApiRequest {
   preRequestScript?: string;
   /** JavaScript run after response (pm.test, pm.expect, pm.response) */
   testScript?: string;
+  /** GraphQL variables (JSON string). Used when requestType is graphql. */
+  graphqlVariables?: string;
+  /** GraphQL operation name. Used when requestType is graphql. */
+  graphqlOperationName?: string;
 }
 
 export interface KeyValuePair {

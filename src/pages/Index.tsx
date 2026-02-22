@@ -7,6 +7,7 @@ import { ResponseViewer } from '@/components/gravitee/ResponseViewer';
 import { WebSocketClient } from '@/components/gravitee/WebSocketClient';
 import { SSEClient } from '@/components/gravitee/SSEClient';
 import { SocketIOClient } from '@/components/gravitee/SocketIOClient';
+import { GraphQLClient } from '@/components/gravitee/GraphQLClient';
 import { EnvironmentSelector } from '@/components/gravitee/EnvironmentSelector';
 import { getEnvironments, setEnvironments, getActiveEnvironmentId, setActiveEnvironmentId, getGlobalVariables, setGlobalVariables } from '@/lib/variables';
 import { getAllRequestsFromCollections, findRequestLocation } from '@/lib/collections';
@@ -200,9 +201,9 @@ const Index = () => {
             isDirty={isDirty}
           />
           <div className="flex items-center gap-1 px-5 py-1.5 border-b border-border bg-card shrink-0">
-            {(['http', 'websocket', 'sse', 'socketio'] as const).map((t) => {
+            {(['http', 'websocket', 'sse', 'socketio', 'graphql'] as const).map((t) => {
               const current = (activeRequest.requestType ?? 'http') === t;
-              const label = t === 'http' ? 'HTTP' : t === 'websocket' ? 'WebSocket' : t === 'sse' ? 'SSE' : 'Socket.IO';
+              const label = t === 'http' ? 'HTTP' : t === 'websocket' ? 'WebSocket' : t === 'sse' ? 'SSE' : t === 'socketio' ? 'Socket.IO' : 'GraphQL';
               return (
                 <button
                   key={t}
@@ -241,6 +242,17 @@ const Index = () => {
             if (reqType === 'socketio') {
               return (
                 <SocketIOClient
+                  request={activeRequest}
+                  setRequest={setRequest}
+                  activeEnvId={activeEnvId}
+                  environments={environments}
+                  globalVars={globalVars}
+                />
+              );
+            }
+            if (reqType === 'graphql') {
+              return (
+                <GraphQLClient
                   request={activeRequest}
                   setRequest={setRequest}
                   activeEnvId={activeEnvId}

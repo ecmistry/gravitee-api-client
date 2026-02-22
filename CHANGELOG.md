@@ -240,8 +240,8 @@
 
 | Feature | Status |
 |--------|--------|
-| HTTP / WebSocket / SSE / Socket.IO type selector | Done |
-| Save WebSocket, SSE, Socket.IO configs to collections | Done |
+| HTTP / WebSocket / SSE / Socket.IO / GraphQL type selector | Done |
+| Save WebSocket, SSE, Socket.IO, GraphQL configs to collections | Done |
 | Collection Runner skips non-HTTP requests | Done |
 
 ### Tests (Phase 6)
@@ -250,3 +250,38 @@
 - **WebSocketClient.test.tsx**: URL input, Connect button, Messages/Headers tabs, Send button
 - **SSEClient.test.tsx**: URL input, Connect button, reconnect checkbox, event filter
 - **SocketIOClient.test.tsx**: URL input, Connect button, Emit section, event filter
+
+---
+
+## Phase 7 — GraphQL Support
+
+### GraphQL Request Type
+
+| Feature | Status |
+|--------|--------|
+| Endpoint URL input | Done |
+| Query editor with syntax highlighting and auto-formatting | Done (format; full syntax highlighting deferred) |
+| Variables panel (JSON key/value pairs) | Done |
+| Operation name support | Done |
+
+### Schema Introspection
+
+| Feature | Status |
+|--------|--------|
+| Auto-fetch schema on connect | Done |
+| Schema explorer sidebar (types, fields, descriptions) | Done |
+| Query autocompletion based on schema | Deferred |
+| Documentation panel per type/field | Done |
+
+### Response Viewer
+
+| Feature | Status |
+|--------|--------|
+| Pretty-printed GraphQL response | Done |
+| Error highlighting from the errors array | Done |
+
+### Tests (Phase 7)
+
+- **graphql.test.ts**: formatGraphQL, getExplorableTypes, introspectSchema, executeGraphQL
+- **GraphQLClient.test.tsx**: URL input, Schema/Execute buttons, Query tab, Response tab, Schema sidebar
+- **Phase7.integration.test.tsx**: GraphQL type selector, GraphQL client UI
