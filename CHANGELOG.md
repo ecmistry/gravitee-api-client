@@ -441,4 +441,6 @@
 ### Tests (Phase 11)
 
 - **monitors.test.ts**: getMonitors, setMonitors, add/update/remove, getRunHistory, addRunRecord, getIntervalMs
+- **monitorScheduler.test.ts**: isMonitorDue, getNextRunTime, createScheduler (start/stop)
+- **monitorAlerts.test.ts**: runMonitorAlert (webhook enabled/disabled, URL validation)
 - **Phase11.integration.test.tsx**: Monitoring button in top bar, opens sheet with Monitors and Results tabs
