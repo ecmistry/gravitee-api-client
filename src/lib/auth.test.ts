@@ -119,7 +119,7 @@ describe('auth', () => {
     it('decodes standard JWT claims', () => {
       const claims = { sub: 'user-id', iat: 1234567890 };
       const payload = btoa(JSON.stringify(claims)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-      const token = `eyJhbGciOiJIUzI1NiJ9.${payload}.sig`;
+      const token = `header.${payload}.sig`;
       const result = decodeJwtPayload(token);
       expect(result).toEqual(claims);
     });
