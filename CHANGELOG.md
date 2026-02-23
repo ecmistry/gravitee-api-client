@@ -498,3 +498,19 @@
 - Build: `docker build -t gravitee-api-client .`
 - Run: `docker run -p 3000:3000 gravitee-api-client`
 - Or: `docker compose up --build`
+
+---
+
+## Fixes & Improvements
+
+### Save Request Fix
+
+- Fix save failing silently when saving a request from the default/untitled tab (request not yet in any collection)
+- Requests created in the initial tab or without a collection context now save to the first collection (My Workspace)
+- Add "Request saved" toast feedback on successful save
+- Log save activity for collections
+
+### README
+
+- Add explicit Installation section with Node.js 18+ prerequisite
+- Add npm and yarn alternatives to pnpm commands

@@ -10,9 +10,10 @@ import { SocketIOClient } from '@/components/gravitee/SocketIOClient';
 import { GraphQLClient } from '@/components/gravitee/GraphQLClient';
 import { EnvironmentSelector } from '@/components/gravitee/EnvironmentSelector';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { getCollections, setCollections as saveCollections } from '@/lib/workspaceStorage';
+import { getCollections, setCollections as saveCollections, logCollectionActivity } from '@/lib/workspaceStorage';
 import { getEnvironments, setEnvironments, getActiveEnvironmentId, setActiveEnvironmentId, getGlobalVariables, setGlobalVariables } from '@/lib/variables';
 import { getAllRequestsFromCollections, findRequestLocation } from '@/lib/collections';
+import { toast } from 'sonner';
 import type { Collection, ApiRequest, ApiResponse, RequestType } from '@/types/api';
 
 const Index = () => {
@@ -129,13 +130,24 @@ const Index = () => {
         name: activeRequest.name || 'New Request'
       };
       const loc = findRequestLocation(collections, activeRequest.id);
+
       setCollections(collections.map(col => {
-        if (loc?.collectionId !== col.id) return col;
+        // Request not in any collection (e.g. default tab) — add to first collection
+        if (!loc) {
+          if (collections.length > 0 && col === collections[0]) {
+            logCollectionActivity(activeWorkspaceId, 'create', 'request', newReq.id, newReq.name);
+            return { ...col, requests: [...col.requests, newReq] };
+          }
+          return col;
+        }
+        if (loc.collectionId !== col.id) return col;
         const hasTempInRoot = col.requests.some(r => r.id === activeRequest.id);
         if (hasTempInRoot) {
+          logCollectionActivity(activeWorkspaceId, 'update', 'request', newReq.id, newReq.name);
           return { ...col, requests: col.requests.map(r => r.id === activeRequest.id ? newReq : r) };
         }
         if (loc.folderId) {
+          logCollectionActivity(activeWorkspaceId, 'update', 'request', newReq.id, newReq.name);
           return {
             ...col,
             folders: col.folders.map(f =>
@@ -145,9 +157,6 @@ const Index = () => {
             )
           };
         }
-        if (!loc && col === collections[0]) {
-          return { ...col, requests: [...col.requests, newReq] };
-        }
         return col;
       }));
       setTabs(prev => prev.map(t => t.id === activeRequest.id ? { id: newReq.id, request: newReq } : t));
@@ -156,6 +165,7 @@ const Index = () => {
         const { [activeRequest.id]: _, ...rest } = prev;
         return { ...rest, [newReq.id]: prev[activeRequest.id] };
       });
+      toast.success('Request saved');
     } else {
       const loc = findRequestLocation(collections, activeRequest.id);
       setCollections(collections.map(col => {
@@ -176,6 +186,7 @@ const Index = () => {
         }
         return col;
       }));
+      toast.success('Request saved');
     }
   };
 
