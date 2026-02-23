@@ -57,3 +57,7 @@ Open [http://localhost:3000](http://localhost:3000). The Docker image includes a
 - Tailwind CSS
 - shadcn/ui
 - React Router
+
+## Repository
+
+[https://github.com/gravitee-io-labs/gravitee-api-client](https://github.com/gravitee-io-labs/gravitee-api-client)
