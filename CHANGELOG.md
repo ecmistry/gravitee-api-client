@@ -514,3 +514,10 @@
 
 - Add explicit Installation section with Node.js 18+ prerequisite
 - Add npm and yarn alternatives to pnpm commands
+
+### Drag-and-Drop Requests
+
+- Drag requests between folders within a collection
+- Drag requests from folder to collection root and vice versa
+- Drag requests across collections (between folders or roots)
+- Grip handle on hover for dragging; drop targets highlight when hovering

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getHistory, clearHistory } from '@/lib/history';
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, useDraggable, useDroppable } from '@dnd-kit/core';
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { Collection, ApiRequest, Folder } from '@/types/api';
@@ -12,6 +12,7 @@ import type { AuthConfig } from '@/types/auth';
 import { METHOD_BG_COLORS } from '@/types/api';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { logCollectionActivity } from '@/lib/workspaceStorage';
+import { findRequestLocation } from '@/lib/collections';
 import { AuthTab } from './AuthTab';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import {
@@ -27,6 +28,10 @@ interface SidebarProps {
   activeRequest: ApiRequest;
   setActiveRequest: (request: ApiRequest) => void;
 }
+
+const REQ_PREFIX = 'req-';
+const DROP_FOLDER_PREFIX = 'drop-folder-';
+const DROP_ROOT_PREFIX = 'drop-root-';
 
 function SortableCollectionItem({
   id,
@@ -45,6 +50,53 @@ function SortableCollectionItem({
   return (
     <div ref={setNodeRef} style={style} className="mb-1" onContextMenu={onContextMenu}>
       {children({ dragHandleProps: { ...listeners, ...attributes } })}
+    </div>
+  );
+}
+
+function DraggableRequest({
+  request,
+  children,
+}: {
+  request: ApiRequest;
+  children: (props: { dragHandleProps: Record<string, unknown> }) => React.ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: REQ_PREFIX + request.id });
+  return (
+    <div ref={setNodeRef} className={isDragging ? 'opacity-50' : ''}>
+      {children({ dragHandleProps: { ...listeners, ...attributes } })}
+    </div>
+  );
+}
+
+function DroppableFolder({
+  folderId,
+  children,
+}: {
+  folderId: string;
+  collectionId: string;
+  isExpanded: boolean;
+  children: React.ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: DROP_FOLDER_PREFIX + folderId });
+  return (
+    <div ref={setNodeRef} className={isOver ? 'ring-1 ring-primary/50 rounded' : ''}>
+      {children}
+    </div>
+  );
+}
+
+function DroppableCollectionRoot({
+  collectionId,
+  children,
+}: {
+  collectionId: string;
+  children: React.ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: DROP_ROOT_PREFIX + collectionId });
+  return (
+    <div ref={setNodeRef} className={`min-h-6 ${isOver ? 'ring-1 ring-primary/50 rounded bg-primary/5' : ''}`}>
+      {children}
     </div>
   );
 }
@@ -79,6 +131,45 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor)
   );
+
+  const moveRequest = (requestId: string, targetCollectionId: string, targetFolderId?: string) => {
+    const loc = findRequestLocation(collections, requestId);
+    if (!loc) return;
+    const request = collections
+      .flatMap(c => [...c.requests, ...c.folders.flatMap(f => f.requests)])
+      .find(r => r.id === requestId);
+    if (!request) return;
+
+    setCollections(collections.map(col => {
+      let nextCol = { ...col };
+      if (col.id === loc.collectionId) {
+        if (loc.folderId) {
+          nextCol = {
+            ...nextCol,
+            folders: nextCol.folders.map(f =>
+              f.id === loc.folderId ? { ...f, requests: f.requests.filter(r => r.id !== requestId) } : f
+            ),
+          };
+        } else {
+          nextCol = { ...nextCol, requests: nextCol.requests.filter(r => r.id !== requestId) };
+        }
+      }
+      if (col.id === targetCollectionId) {
+        if (targetFolderId) {
+          nextCol = {
+            ...nextCol,
+            folders: nextCol.folders.map(f =>
+              f.id === targetFolderId ? { ...f, requests: [...f.requests, request] } : f
+            ),
+          };
+        } else {
+          nextCol = { ...nextCol, requests: [...nextCol.requests, request] };
+        }
+      }
+      return nextCol;
+    }));
+    logCollectionActivity(activeWorkspaceId, 'update', 'request', requestId, request.name);
+  };
 
   useEffect(() => {
     if (!contextMenu) return;
@@ -409,9 +500,22 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
           sensors={sensors}
           collisionDetection={closestCenter}
           onDragEnd={(e) => {
-            if (e.over && e.active.id !== e.over.id) {
-              const oldIdx = collections.findIndex(c => c.id === e.active.id);
-              const newIdx = collections.findIndex(c => c.id === e.over!.id);
+            if (!e.over) return;
+            const activeId = String(e.active.id);
+            const overId = String(e.over.id);
+            if (activeId.startsWith(REQ_PREFIX)) {
+              const requestId = activeId.slice(REQ_PREFIX.length);
+              if (overId.startsWith(DROP_FOLDER_PREFIX)) {
+                const folderId = overId.slice(DROP_FOLDER_PREFIX.length);
+                const col = collections.find(c => c.folders.some(f => f.id === folderId));
+                if (col) moveRequest(requestId, col.id, folderId);
+              } else if (overId.startsWith(DROP_ROOT_PREFIX)) {
+                const collectionId = overId.slice(DROP_ROOT_PREFIX.length);
+                moveRequest(requestId, collectionId);
+              }
+            } else if (collections.some(c => c.id === activeId) && collections.some(c => c.id === overId)) {
+              const oldIdx = collections.findIndex(c => c.id === activeId);
+              const newIdx = collections.findIndex(c => c.id === overId);
               if (oldIdx >= 0 && newIdx >= 0) setCollections(arrayMove(collections, oldIdx, newIdx));
             }
           }}
@@ -503,7 +607,8 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
                   className="overflow-hidden ml-5 mt-0.5 space-y-0.5"
                 >
                   {collection.folders.map((folder) => (
-                    <div key={folder.id} className="mb-0.5" onContextMenu={(e) => { e.preventDefault(); setContextMenu({ type: 'folder', folder, collectionId: collection.id, x: e.clientX, y: e.clientY }); }}>
+                    <DroppableFolder key={folder.id} folderId={folder.id} collectionId={collection.id} isExpanded={expandedFolders.has(folder.id)}>
+                    <div className="mb-0.5" onContextMenu={(e) => { e.preventDefault(); setContextMenu({ type: 'folder', folder, collectionId: collection.id, x: e.clientX, y: e.clientY }); }}>
                       <div className="flex items-center justify-between group/folder">
                         <button
                           onClick={() => toggleFolder(folder.id)}
@@ -532,22 +637,33 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
                         {expandedFolders.has(folder.id) && (
                           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden ml-4 mt-0.5 space-y-0.5">
                             {folder.requests.map((request) => (
-                              <div key={request.id} className={`flex items-center gap-2 group/req ${activeRequest.id === request.id ? 'bg-primary/10 border-l-2 border-primary' : 'border-l-2 border-transparent'}`} onContextMenu={(e) => { e.preventDefault(); setContextMenu({ type: 'request', request, collectionId: collection.id, folderId: folder.id, x: e.clientX, y: e.clientY }); }}>
+                              <DraggableRequest key={request.id} request={request}>
+                                {({ dragHandleProps }) => (
+                              <div className={`flex items-center gap-2 group/req ${activeRequest.id === request.id ? 'bg-primary/10 border-l-2 border-primary' : 'border-l-2 border-transparent'}`} onContextMenu={(e) => { e.preventDefault(); setContextMenu({ type: 'request', request, collectionId: collection.id, folderId: folder.id, x: e.clientX, y: e.clientY }); }}>
+                                <div className="cursor-grab active:cursor-grabbing p-0.5 shrink-0 opacity-0 group-hover/req:opacity-100 touch-none" title="Drag to move" {...dragHandleProps}>
+                                  <GripVertical className="w-3 h-3 text-muted-foreground" />
+                                </div>
                                 <button onClick={() => setActiveRequest(request)} className={`flex-1 flex items-center gap-2 px-2 py-1.5 rounded-md text-left text-xs min-w-0 ${activeRequest.id === request.id ? '' : 'hover:bg-secondary/50'}`}>
                                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${METHOD_BG_COLORS[request.method] || ''}`}>{request.method}</span>
                                   {editingRequestId === request.id ? <Input value={editingName} onChange={(e) => setEditingName(e.target.value)} onBlur={saveRenameRequest} onKeyDown={(e) => { if (e.key === 'Enter') saveRenameRequest(); if (e.key === 'Escape') cancelRenameRequest(); }} onClick={(e) => e.stopPropagation()} className="h-6 text-xs px-1.5 py-0 flex-1 min-w-0" autoFocus /> : <span className="text-sidebar-foreground truncate flex-1 block" onDoubleClick={(e) => { e.stopPropagation(); startRenameRequest(request); }}>{request.name}</span>}
                                 </button>
                                 {editingRequestId !== request.id && <Button variant="ghost" size="icon" className="w-6 h-6 shrink-0 opacity-0 group-hover/req:opacity-100" onClick={(e) => { e.stopPropagation(); startRenameRequest(request); }}><Pencil className="w-3.5 h-3.5" /></Button>}
                               </div>
+                                )}
+                              </DraggableRequest>
                             ))}
                           </motion.div>
                         )}
                       </AnimatePresence>
                     </div>
+                    </DroppableFolder>
                   ))}
+                  <DroppableCollectionRoot collectionId={collection.id}>
+                  <div className="space-y-0.5">
                   {collection.requests.map((request) => (
+                    <DraggableRequest key={request.id} request={request}>
+                      {({ dragHandleProps }) => (
                     <div
-                      key={request.id}
                       className={`flex items-center gap-2 group/req ${
                         activeRequest.id === request.id
                           ? 'bg-primary/10 border-l-2 border-primary'
@@ -564,6 +680,9 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
                         });
                       }}
                     >
+                      <div className="cursor-grab active:cursor-grabbing p-0.5 shrink-0 opacity-0 group-hover/req:opacity-100 touch-none" title="Drag to move" {...dragHandleProps}>
+                        <GripVertical className="w-3 h-3 text-muted-foreground" />
+                      </div>
                       <button
                         onClick={() => setActiveRequest(request)}
                         className={`flex-1 flex items-center gap-2 px-2 py-1.5 rounded-md text-left transition-all text-xs min-w-0 ${
@@ -613,7 +732,11 @@ export function GraviteeSidebar({ collections, setCollections, activeRequest, se
                         </Button>
                       )}
                     </div>
+                      )}
+                    </DraggableRequest>
                   ))}
+                  </div>
+                  </DroppableCollectionRoot>
                   <div className="flex gap-1 mt-1">
                     <button onClick={() => addNewFolder(collection.id)} className="text-[10px] text-muted-foreground hover:text-foreground px-2 py-0.5">+ Add folder</button>
                     <span className="text-muted-foreground">·</span>
