@@ -28,12 +28,16 @@ FROM node:20-alpine AS runner
 
 WORKDIR /app
 
-# Copy built assets and server script from builder
+# Copy built assets, server scripts (serve + mcp-bridge), and package files
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/scripts/serve.mjs ./scripts/
+COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/package.json ./
+COPY --from=builder /app/package-lock.json* ./
+COPY --from=builder /app/pnpm-lock.yaml* ./
 
-# No node_modules needed at runtime (serve uses only Node built-ins)
+# Install production deps (needed for /mcp-bridge which uses @modelcontextprotocol/sdk)
+RUN npm ci --omit=dev 2>/dev/null || npm install --omit=dev
+
 EXPOSE 3000
 
 ENV NODE_ENV=production

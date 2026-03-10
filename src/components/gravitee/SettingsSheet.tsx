@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { getActivity } from '@/lib/workspaces';
-import { User, Layers, Activity } from 'lucide-react';
+import { User, Layers, Activity, Key } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 interface SettingsSheetProps {
@@ -42,7 +42,7 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
           <SheetTitle>Settings</SheetTitle>
         </SheetHeader>
         <Tabs defaultValue="workspaces" className="mt-4">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="workspaces" className="text-xs">
               <Layers className="w-3.5 h-3.5 mr-1" />
               Workspaces
@@ -50,6 +50,10 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
             <TabsTrigger value="profile" className="text-xs">
               <User className="w-3.5 h-3.5 mr-1" />
               Profile
+            </TabsTrigger>
+            <TabsTrigger value="api-keys" className="text-xs">
+              <Key className="w-3.5 h-3.5 mr-1" />
+              API Keys
             </TabsTrigger>
             <TabsTrigger value="activity" className="text-xs">
               <Activity className="w-3.5 h-3.5 mr-1" />
@@ -106,6 +110,20 @@ export function SettingsSheet({ open, onOpenChange }: SettingsSheetProps) {
               <User className="w-8 h-8 mx-auto mb-2 opacity-50" />
               <p>Sign in to sync across devices and collaborate.</p>
               <p className="text-xs mt-1">Email + password and OAuth (GitHub/Google) require a backend.</p>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="api-keys" className="mt-4 space-y-4">
+            <p className="text-xs text-muted-foreground">
+              For LLM and AI (embeddings, image) request types, set these variables in your <strong>Environment</strong> or <strong>Global variables</strong> (top bar). Keys are never logged or sent except to the provider API.
+            </p>
+            <div className="space-y-2 rounded-lg border border-border p-3">
+              <p className="text-xs font-mono font-medium">OPENAI_API_KEY</p>
+              <p className="text-[10px] text-muted-foreground">OpenAI chat, embeddings, and DALL·E image generation.</p>
+            </div>
+            <div className="space-y-2 rounded-lg border border-border p-3">
+              <p className="text-xs font-mono font-medium">ANTHROPIC_API_KEY</p>
+              <p className="text-[10px] text-muted-foreground">Anthropic Claude chat completions.</p>
             </div>
           </TabsContent>
 

@@ -23,8 +23,17 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 
 
 export type BodyType = 'none' | 'json' | 'xml' | 'text' | 'html' | 'form-data' | 'form-urlencoded';
 
-/** Request type: HTTP, WebSocket, SSE, Socket.IO, or GraphQL */
-export type RequestType = 'http' | 'websocket' | 'sse' | 'socketio' | 'graphql';
+/** Request type: HTTP, WebSocket, SSE, Socket.IO, GraphQL, MCP, LLM, or AI */
+export type RequestType = 'http' | 'websocket' | 'sse' | 'socketio' | 'graphql' | 'mcp' | 'llm' | 'ai';
+
+/** MCP server transport: stdio (via bridge) or HTTP/SSE */
+export type McpTransportType = 'stdio' | 'http';
+
+/** LLM provider for chat completions */
+export type LLMProvider = 'openai' | 'anthropic';
+
+/** AI capability sub-type (when requestType is 'ai') */
+export type AISubType = 'embeddings' | 'image';
 
 /** Auth inheritance: use own auth, or inherit from folder/collection */
 export type AuthInheritance = 'inherit' | 'none'; // inherit = use parent, none = use request's own auth
@@ -55,6 +64,46 @@ export interface ApiRequest {
   graphqlVariables?: string;
   /** GraphQL operation name. Used when requestType is graphql. */
   graphqlOperationName?: string;
+  /** MCP: transport type. Used when requestType is mcp. */
+  mcpTransport?: McpTransportType;
+  /** MCP: for stdio, command to spawn (e.g. npx -y @modelcontextprotocol/server-filesystem). */
+  mcpCommand?: string;
+  /** MCP: for stdio, optional args array as JSON string. */
+  mcpArgs?: string;
+  /** MCP: for http, server URL. */
+  mcpServerUrl?: string;
+  /** MCP: selected tool name when invoking. */
+  mcpToolName?: string;
+  /** MCP: tool call arguments as JSON string. */
+  mcpToolArgs?: string;
+  /** LLM: provider. Used when requestType is llm. */
+  llmProvider?: LLMProvider;
+  /** LLM: model id (e.g. gpt-4o, claude-3-5-sonnet). */
+  llmModel?: string;
+  /** LLM: system message. */
+  llmSystemMessage?: string;
+  /** LLM: user message(s); for MVP single message in body or here. */
+  llmUserMessage?: string;
+  /** LLM: temperature 0–2. */
+  llmTemperature?: number;
+  /** LLM: max tokens. */
+  llmMaxTokens?: number;
+  /** LLM: stream response. */
+  llmStream?: boolean;
+  /** AI: sub-type (embeddings | image). Used when requestType is ai. */
+  aiSubType?: AISubType;
+  /** AI: provider (e.g. openai). */
+  aiProvider?: 'openai';
+  /** AI: model (e.g. text-embedding-3-small, dall-e-3). */
+  aiModel?: string;
+  /** AI embeddings: input text(s); body or comma/newline separated. */
+  aiEmbeddingInput?: string;
+  /** AI image: prompt for generation. */
+  aiImagePrompt?: string;
+  /** AI image: size (e.g. 1024x1024). */
+  aiImageSize?: string;
+  /** AI image: n (number of images). */
+  aiImageN?: number;
 }
 
 export interface KeyValuePair {
@@ -70,6 +119,32 @@ export interface ApiResponse {
   data: unknown;
   time: number;
   size: number;
+}
+
+/** MCP tool call result (content parts, isError). Shown in response viewer when data is this shape. */
+export interface McpToolResult {
+  content?: Array<{ type: string; text?: string }>;
+  isError?: boolean;
+  _raw?: unknown;
+}
+
+/** LLM chat completion response (choices, usage). */
+export interface LLMCompletionResponse {
+  choices?: Array<{ message?: { role: string; content: string }; delta?: { content?: string }; finish_reason?: string }>;
+  usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+  _raw?: unknown;
+}
+
+/** Embeddings API response (data array of embedding objects). */
+export interface EmbeddingResponse {
+  data?: Array<{ embedding: number[]; index?: number }>;
+  _raw?: unknown;
+}
+
+/** Image generation response (url or b64). */
+export interface ImageGenerationResponse {
+  data?: Array<{ url?: string; b64_json?: string }>;
+  _raw?: unknown;
 }
 
 export const METHOD_COLORS: Record<string, string> = {

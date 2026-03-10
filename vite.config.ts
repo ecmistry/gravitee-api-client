@@ -1,6 +1,9 @@
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // CORS proxy for dev: forwards API requests server-side to avoid CORS
 function corsProxyPlugin(): Plugin {
@@ -53,6 +56,36 @@ function corsProxyPlugin(): Plugin {
   };
 }
 
+function mcpBridgePlugin(): Plugin {
+  return {
+    name: "mcp-bridge",
+    configureServer(server) {
+      server.middlewares.use("/mcp-bridge", async (req, res) => {
+        if (req.method !== "POST") {
+          res.writeHead(405, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ error: "Method not allowed" }));
+          return;
+        }
+        let body = "";
+        req.on("data", (chunk) => {
+          body += chunk.toString();
+        });
+        req.on("end", async () => {
+          try {
+            const { handleMcpBridge } = await import(path.join(__dirname, "scripts/mcp-bridge.mjs"));
+            const result = await handleMcpBridge(body);
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(JSON.stringify(result));
+          } catch (e) {
+            res.writeHead(500, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ ok: false, error: String(e) }));
+          }
+        });
+      });
+    },
+  };
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
@@ -62,7 +95,7 @@ export default defineConfig(({ mode }) => ({
       overlay: false,
     },
   },
-  plugins: [react(), corsProxyPlugin()],
+  plugins: [react(), corsProxyPlugin(), mcpBridgePlugin()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

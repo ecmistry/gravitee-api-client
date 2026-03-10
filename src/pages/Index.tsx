@@ -8,6 +8,9 @@ import { WebSocketClient } from '@/components/gravitee/WebSocketClient';
 import { SSEClient } from '@/components/gravitee/SSEClient';
 import { SocketIOClient } from '@/components/gravitee/SocketIOClient';
 import { GraphQLClient } from '@/components/gravitee/GraphQLClient';
+import { McpClient } from '@/components/gravitee/McpClient';
+import { LLMClient } from '@/components/gravitee/LLMClient';
+import { AIClient } from '@/components/gravitee/AIClient';
 import { EnvironmentSelector } from '@/components/gravitee/EnvironmentSelector';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { getCollections, setCollections as saveCollections, logCollectionActivity } from '@/lib/workspaceStorage';
@@ -219,9 +222,19 @@ const Index = () => {
             isDirty={isDirty}
           />
           <div className="flex items-center gap-1 px-5 py-1.5 border-b border-border bg-card shrink-0">
-            {(['http', 'websocket', 'sse', 'socketio', 'graphql'] as const).map((t) => {
+            {(['http', 'websocket', 'sse', 'socketio', 'graphql', 'mcp', 'llm', 'ai'] as const).map((t) => {
               const current = (activeRequest.requestType ?? 'http') === t;
-              const label = t === 'http' ? 'HTTP' : t === 'websocket' ? 'WebSocket' : t === 'sse' ? 'SSE' : t === 'socketio' ? 'Socket.IO' : 'GraphQL';
+              const labels: Record<RequestType, string> = {
+                http: 'HTTP',
+                websocket: 'WebSocket',
+                sse: 'SSE',
+                socketio: 'Socket.IO',
+                graphql: 'GraphQL',
+                mcp: 'MCP',
+                llm: 'LLM',
+                ai: 'AI',
+              };
+              const label = labels[t];
               return (
                 <button
                   key={t}
@@ -277,6 +290,51 @@ const Index = () => {
                   environments={environments}
                   globalVars={globalVars}
                 />
+              );
+            }
+            if (reqType === 'mcp') {
+              return (
+                <>
+                  <McpClient
+                    request={activeRequest}
+                    setRequest={setRequest}
+                    setResponse={setResponse}
+                    activeEnvId={activeEnvId}
+                    environments={environments}
+                    globalVars={globalVars}
+                  />
+                  <ResponseViewer response={response} loading={false} testResults={[]} />
+                </>
+              );
+            }
+            if (reqType === 'llm') {
+              return (
+                <>
+                  <LLMClient
+                    request={activeRequest}
+                    setRequest={setRequest}
+                    setResponse={setResponse}
+                    activeEnvId={activeEnvId}
+                    environments={environments}
+                    globalVars={globalVars}
+                  />
+                  <ResponseViewer response={response} loading={false} testResults={[]} />
+                </>
+              );
+            }
+            if (reqType === 'ai') {
+              return (
+                <>
+                  <AIClient
+                    request={activeRequest}
+                    setRequest={setRequest}
+                    setResponse={setResponse}
+                    activeEnvId={activeEnvId}
+                    environments={environments}
+                    globalVars={globalVars}
+                  />
+                  <ResponseViewer response={response} loading={false} testResults={[]} />
+                </>
               );
             }
             return (

@@ -237,7 +237,7 @@ export function RequestBuilder({ request, setRequest, setResponse, setTestResult
               onChange={(e) => setRequest({ ...request, url: e.target.value })}
               className="h-9 bg-background border-border text-foreground placeholder:text-muted-foreground font-mono text-sm focus:border-primary focus:ring-1 focus:ring-primary"
             />
-            {(activeEnvId || globalVars?.length) && /\{\{\w+\}\}/.test(request.url) && (
+            {(!!activeEnvId || (globalVars?.length ?? 0) > 0) && /\{\{\w+\}\}/.test(request.url) && (
               <span className="text-[10px] text-primary/80 font-mono">Variables will be resolved on Send</span>
             )}
           </div>
@@ -425,7 +425,7 @@ export function RequestBuilder({ request, setRequest, setResponse, setTestResult
                 onChange={(e) => setRequest({ ...request, body: e.target.value })}
                 className="min-h-[140px] bg-background border-border text-foreground placeholder:text-muted-foreground font-mono text-xs resize-none"
               />
-              {(activeEnvId || globalVars?.length) && request.body && /\{\{\w+\}\}/.test(request.body) && (
+              {(!!activeEnvId || (globalVars?.length ?? 0) > 0) && request.body && /\{\{\w+\}\}/.test(request.body) && (
                 <span className="text-[10px] text-primary/80 font-mono">Variables will be resolved on Send</span>
               )}
             </div>

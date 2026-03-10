@@ -482,6 +482,58 @@
 
 ---
 
+## Phase 13 — MCP, LLM & AI Testing
+
+### MCP (Model Context Protocol)
+
+| Feature | Status |
+|--------|--------|
+| MCP request type in request-type strip | Done |
+| stdio transport via backend bridge (list_tools, call_tool) | Done |
+| Connection config: command + args (e.g. npx, server package) | Done |
+| List tools from MCP server | Done |
+| Tool selector + JSON arguments editor | Done |
+| Run tool and view result in response panel | Done |
+| MCP bridge in Vite dev and production serve | Done |
+
+### LLM (Chat Completions)
+
+| Feature | Status |
+|--------|--------|
+| LLM request type | Done |
+| Provider: OpenAI, Anthropic | Done |
+| Model selector (e.g. gpt-4o, claude-3-5-sonnet) | Done |
+| System message and user message | Done |
+| Temperature and max tokens | Done |
+| Streaming responses | Done |
+| API keys via environment or global variables (OPENAI_API_KEY, ANTHROPIC_API_KEY) | Done |
+
+### AI (Embeddings & Image)
+
+| Feature | Status |
+|--------|--------|
+| AI request type with Embeddings / Image tabs | Done |
+| Embeddings: OpenAI (text-embedding-3-small, etc.), input text(s) | Done |
+| Image generation: DALL·E (dall-e-3, dall-e-2), prompt, size, n | Done |
+| OPENAI_API_KEY for embeddings and image | Done |
+
+### Integration
+
+| Feature | Status |
+|--------|--------|
+| ResponseViewer for MCP/LLM/AI responses | Done |
+| Settings → API Keys tab (documentation for OPENAI_API_KEY, ANTHROPIC_API_KEY) | Done |
+| README section for MCP, LLM, AI usage | Done |
+| Collection Runner / API Docs / Mock continue to filter to HTTP only | Unchanged |
+
+### Tests (Phase 13)
+
+- **mcpClient.test.ts**: listToolsStdio, callToolStdio (fetch payloads)
+- **McpClient.test.tsx**, **LLMClient.test.tsx**, **AIClient.test.tsx**: UI and controls
+- **Phase13.integration.test.tsx**: MCP, LLM, AI type selectors and client UIs
+
+---
+
 ## Docker Deployment
 
 ### Docker Support
@@ -490,6 +542,7 @@
 |--------|--------|
 | Multi-stage Dockerfile (Node 20 Alpine) | Done |
 | Production server with static files + CORS proxy | Done |
+| MCP bridge in production (scripts + production deps in image) | Done |
 | docker-compose.yml for one-command startup | Done |
 | CORS proxy enabled in Docker builds (VITE_USE_CORS_PROXY) | Done |
 

@@ -109,6 +109,20 @@ const server = createServer(async (req, res) => {
     return;
   }
 
+  if (pathname === "/mcp-bridge" && req.method === "POST") {
+    try {
+      const body = await collectBody(req);
+      const { handleMcpBridge } = await import("./mcp-bridge.mjs");
+      const result = await handleMcpBridge(body);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify(result));
+    } catch (e) {
+      res.writeHead(500, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ ok: false, error: String(e) }));
+    }
+    return;
+  }
+
   await serveStatic(res, pathname);
 });
 
